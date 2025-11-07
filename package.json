@@ -1,0 +1,36 @@
+{
+  "name": "oakview",
+  "version": "1.0.0",
+  "description": "Lightweight Charts Web Component for easy embedding",
+  "type": "module",
+  "main": "dist/oakview.umd.js",
+  "module": "dist/oakview.es.js",
+  "exports": {
+    ".": {
+      "import": "./dist/oakview.es.js",
+      "require": "./dist/oakview.umd.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "charts",
+    "lightweight-charts",
+    "web-component",
+    "trading"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "lightweight-charts": "^4.1.0"
+  }
+}

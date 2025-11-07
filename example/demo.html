@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OakView Chart Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #131722;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        oakview-chart {
+            width: 100%;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <oakview-chart
+        id="chart1"
+        symbol="SPX"
+        theme="dark"
+        show-toolbar="true"
+        data-source="SP_SPX, 1D.csv">
+    </oakview-chart>
+
+    <script type="module">
+        import '../src/oakview-chart-ui.js';
+    </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "oakview-websocket-example",
+  "version": "1.0.0",
+  "description": "Example of integrating OakView with real-time WebSocket data",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "lightweight-charts": "^4.1.0"
+  }
+}

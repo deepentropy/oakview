@@ -3,7 +3,25 @@
     "allow": [
       "Bash(dir:*)",
       "Bash(npm install)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /F /PID 6764)",
+      "Bash(taskkill /F /PID 12540)",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c:*)",
+      "Bash(cmd /c \"taskkill /F /PID 6764 & taskkill /F /PID 12540\")",
+      "Bash(cmd /c \"taskkill /F /PID 17016 & taskkill /F /PID 12540 & taskkill /F /PID 30176 & taskkill /F /PID 23400\")",
+      "Bash(cmd /c \"tasklist | findstr node\")",
+      "Bash(tasklist:*)",
+      "WebSearch",
+      "WebFetch(domain:tradingview.github.io)",
+      "Bash(mkdir:*)",
+      "Bash(nul)",
+      "Bash(cmd /c \"mkdir data-providers 2>nul & echo Done\")",
+      "Bash(cmd /c:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []

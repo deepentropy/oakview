@@ -57,36 +57,31 @@ class OakViewChart extends HTMLElement {
     this._data = [];
     this._allData = [];
     this._currentDataPoints = 365;
+    this._dataProvider = null;
+    this._subscriptionUnsubscribe = null;
   }
 
   static get observedAttributes() {
-    return ['width', 'height', 'theme', 'symbol', 'show-toolbar', 'data-source'];
+    return ['width', 'height', 'theme', 'symbol', 'show-toolbar', 'data-source', 'hide-sidebar'];
   }
 
   async connectedCallback() {
     this.render();
-    this.initChart();
-    this.setupEventListeners();
 
-    // Load data if data-source is provided
-    const dataSource = this.getAttribute('data-source');
-    if (dataSource) {
-      await this.loadDataFromSource(dataSource);
-    }
+    // Defer chart initialization to next frame to ensure container has dimensions
+    requestAnimationFrame(() => {
+      this.initChart();
+      this.setupEventListeners();
 
-    // Handle resize
-    this._resizeObserver = new ResizeObserver(() => {
-      if (this._chart) {
-        const container = this.shadowRoot.querySelector('.chart-container');
-        this._chart.applyOptions({
-          width: container.clientWidth,
-          height: container.clientHeight
-        });
+      // Load data if data-source is provided
+      const dataSource = this.getAttribute('data-source');
+      if (dataSource) {
+        this.loadDataFromSource(dataSource);
       }
     });
 
-    const container = this.shadowRoot.querySelector('.chart-container');
-    this._resizeObserver.observe(container);
+    // No need for manual resize observer when using autoSize
+    // The chart will automatically resize to fit its container
   }
 
   async loadDataFromSource(url) {
@@ -106,10 +101,66 @@ class OakViewChart extends HTMLElement {
     this.updateChartType();
   }
 
-  disconnectedCallback() {
-    if (this._resizeObserver) {
-      this._resizeObserver.disconnect();
+  /**
+   * Set a custom data provider
+   * @param {OakViewDataProvider} provider - Data provider instance
+   * @public
+   */
+  setDataProvider(provider) {
+    this._dataProvider = provider;
+  }
+
+  /**
+   * Get the current data provider
+   * @returns {OakViewDataProvider|null}
+   * @public
+   */
+  getDataProvider() {
+    return this._dataProvider;
+  }
+
+  /**
+   * Update chart with real-time data (efficient single-point update)
+   * @param {Object} data - OHLCV data point
+   * @public
+   */
+  updateRealtime(data) {
+    if (!this._currentSeries) return;
+
+    try {
+      this._currentSeries.update(data);
+    } catch (error) {
+      console.error('Failed to update realtime data:', error);
     }
+  }
+
+  /**
+   * Set bulk data (replaces all existing data)
+   * @param {Array} data - Array of OHLCV data
+   * @public
+   */
+  setData(data) {
+    this._allData = data;
+    this._data = data;
+    this.updateChartType();
+  }
+
+  /**
+   * Get the lightweight-charts instance
+   * @returns {IChartApi|null}
+   * @public
+   */
+  getChart() {
+    return this._chart;
+  }
+
+  disconnectedCallback() {
+    // Cleanup subscription if exists
+    if (this._subscriptionUnsubscribe) {
+      this._subscriptionUnsubscribe();
+      this._subscriptionUnsubscribe = null;
+    }
+
     if (this._chart) {
       this._chart.remove();
       this._chart = null;
@@ -127,10 +178,16 @@ class OakViewChart extends HTMLElement {
       const symbolBtn = this.shadowRoot.querySelector('.symbol-button');
       if (symbolBtn) symbolBtn.textContent = newValue || 'SYMBOL';
     }
+
+    if (name === 'data-source' && newValue && this._chart) {
+      // Load data when data-source attribute changes
+      this.loadDataFromSource(newValue);
+    }
   }
 
   render() {
     const showToolbar = this.getAttribute('show-toolbar') !== 'false';
+    const hideSidebar = this.getAttribute('hide-sidebar') === 'true';
 
     const style = document.createElement('style');
     style.textContent = `
@@ -145,16 +202,26 @@ class OakViewChart extends HTMLElement {
         position: relative;
       }
 
+      .wrapper {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        flex: 1;
+      }
+
       .toolbar {
         display: ${showToolbar ? 'flex' : 'none'};
         height: 38px;
         background: #131722;
-        border-bottom: 4px solid #2E2E2E;
+        border-bottom: 1px solid #2a2e39;
         align-items: center;
         padding: 0 8px;
         gap: 8px;
         flex-shrink: 0;
         font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+        font-size: 14px;
+        font-feature-settings: "lnum", "tnum";
       }
 
       .main-content {
@@ -164,6 +231,7 @@ class OakViewChart extends HTMLElement {
       }
 
       .sidebar-left {
+        display: ${hideSidebar ? 'none' : 'block'};
         width: 52px;
         background: #131722;
         border-right: 4px solid #2E2E2E;
@@ -175,9 +243,11 @@ class OakViewChart extends HTMLElement {
         display: flex;
         flex-direction: column;
         min-width: 0;
+        min-height: 0;
       }
 
       .sidebar-right {
+        display: ${hideSidebar ? 'none' : 'block'};
         width: 52px;
         background: #131722;
         border-left: 4px solid #2E2E2E;
@@ -185,6 +255,7 @@ class OakViewChart extends HTMLElement {
       }
 
       .bottom-bar {
+        display: ${hideSidebar ? 'none' : 'block'};
         height: 24px;
         background: #131722;
         border-top: 4px solid #2E2E2E;
@@ -194,9 +265,9 @@ class OakViewChart extends HTMLElement {
       .chart-container {
         flex: 1;
         position: relative;
+        overflow: hidden;
         min-height: 0;
-        width: 100%;
-        height: 100%;
+        background: #1E222D; /* Debug: ensure this CSS is loaded */
       }
 
       .toolbar-group {
@@ -208,32 +279,45 @@ class OakViewChart extends HTMLElement {
       .separator {
         width: 1px;
         height: 24px;
-        background: #2a2e39;
-        margin: 0 4px;
+        background: #4a4a4a;
+        margin: 0 8px;
+        flex-shrink: 0;
       }
 
       .toolbar-button {
         background: transparent;
         border: none;
         color: #dbdbdb;
-        padding: 6px 12px;
+        padding: 6px 8px;
         border-radius: 4px;
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;
-        transition: background 0.2s, color 0.2s;
+        transition: background 0.15s, color 0.15s;
         white-space: nowrap;
-        font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+        font-family: inherit;
+        display: flex;
+        align-items: center;
+        gap: 6px;
       }
 
       .toolbar-button:hover {
-        background: #2a2e39;
+        background: #2e2e2e;
         color: #dbdbdb;
       }
 
       .toolbar-button.active {
-        background: #2962ff;
-        color: #dbdbdb;
+        background: #132042;
+        color: #2962ff;
+      }
+
+      .toolbar-button.active:hover {
+        background: #142e61;
+        color: #1e53e5;
+      }
+
+      .toolbar-button svg {
+        flex-shrink: 0;
       }
 
       .symbol-button {
@@ -252,15 +336,58 @@ class OakViewChart extends HTMLElement {
         min-width: 32px;
       }
 
-      .chart-style-button {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-
       .chart-style-button svg {
         width: 28px;
         height: 28px;
+      }
+
+      /* Icon-only buttons */
+      .toolbar-button.icon-only {
+        padding: 4px;
+        min-width: 36px;
+        min-height: 36px;
+        justify-content: center;
+      }
+
+      /* Radio group for timeframes */
+      .timeframe-radio-group {
+        display: flex;
+        gap: 0;
+        background: transparent;
+        border-radius: 4px;
+      }
+
+      .timeframe-radio-group .toolbar-button {
+        border-radius: 0;
+        padding: 4px 8px;
+        font-size: 13px;
+        min-width: 32px;
+        justify-content: center;
+        position: relative;
+      }
+
+      .timeframe-radio-group .toolbar-button:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      .timeframe-radio-group .toolbar-button:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+
+      .timeframe-radio-group .toolbar-button.active {
+        background: #132042;
+        color: #2962ff;
+      }
+
+      /* Dropdown arrow button */
+      .dropdown-arrow-button {
+        padding: 6px;
+        min-width: 28px;
+      }
+
+      .dropdown-arrow-button svg {
+        width: 16px;
+        height: 8px;
       }
 
       .dropdown {
@@ -682,13 +809,301 @@ class OakViewChart extends HTMLElement {
         width: 18px;
         height: 18px;
       }
+
+      /* Symbol Search Modal */
+      .symbol-search-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(2px);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        z-index: 10001;
+      }
+
+      .symbol-search-modal.show {
+        display: flex;
+      }
+
+      .symbol-search-content {
+        background: #1E222D;
+        border-radius: 8px;
+        margin-top: 64px;
+        width: 100%;
+        max-width: 800px;
+        max-height: 600px;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #2A2E39;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      .symbol-search-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        border-bottom: 1px solid #2A2E39;
+      }
+
+      .symbol-search-header h2 {
+        font-size: 15px;
+        font-weight: 600;
+        color: white;
+        margin: 0;
+      }
+
+      .symbol-search-close {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        border: none;
+        background: transparent;
+        color: #787B86;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .symbol-search-close:hover {
+        background: #2A2E39;
+        color: white;
+      }
+
+      .symbol-search-input-wrapper {
+        padding: 12px 20px;
+        border-bottom: 1px solid #2A2E39;
+        position: relative;
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 32px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #787B86;
+      }
+
+      .symbol-search-input {
+        width: 100%;
+        background: #131722;
+        border: 1px solid #2A2E39;
+        border-radius: 4px;
+        padding: 10px 16px 10px 40px;
+        font-size: 14px;
+        color: white;
+        outline: none;
+        transition: border-color 0.2s;
+        font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+      }
+
+      .symbol-search-input:focus {
+        border-color: #2962FF;
+      }
+
+      .symbol-search-categories {
+        display: flex;
+        gap: 4px;
+        padding: 8px 20px;
+        border-bottom: 1px solid #2A2E39;
+        overflow-x: auto;
+      }
+
+      .category-btn {
+        padding: 6px 16px;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.2s;
+        background: transparent;
+        color: #787B86;
+        font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+      }
+
+      .category-btn:hover {
+        background: rgba(42, 46, 57, 0.5);
+        color: white;
+      }
+
+      .category-btn.active {
+        background: #2A2E39;
+        color: white;
+      }
+
+      .symbol-search-list {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 300px;
+      }
+
+      .symbol-item {
+        width: 100%;
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: none;
+        border-top: 1px solid #2A2E39;
+        background: transparent;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+      }
+
+      .symbol-item:hover {
+        background: #2A2E39;
+      }
+
+      .symbol-item.active {
+        background: rgba(42, 46, 57, 0.5);
+      }
+
+      .symbol-item-info {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .symbol-item-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: bold;
+        background: #2A2E39;
+        color: #787B86;
+      }
+
+      .symbol-item.active .symbol-item-icon {
+        background: #2962FF;
+        color: white;
+      }
+
+      .symbol-item-details {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .symbol-item-symbol {
+        font-size: 15px;
+        font-weight: 600;
+        color: white;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .symbol-item.active .symbol-item-symbol {
+        color: #2962FF;
+      }
+
+      .symbol-item-badge {
+        padding: 2px 6px;
+        background: #2962FF;
+        color: white;
+        font-size: 10px;
+        font-weight: 500;
+        border-radius: 3px;
+        text-transform: uppercase;
+      }
+
+      .symbol-item-name {
+        font-size: 12px;
+        color: #787B86;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .symbol-item-arrow {
+        width: 20px;
+        height: 20px;
+        color: #787B86;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .symbol-item.active .symbol-item-arrow {
+        color: #2962FF;
+        opacity: 1;
+      }
+
+      .symbol-search-footer {
+        padding: 12px 20px;
+        border-top: 1px solid #2A2E39;
+        background: #1E222D;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+      }
+
+      .symbol-count {
+        color: #787B86;
+      }
+
+      .symbol-search-hints {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #787B86;
+      }
+
+      .symbol-search-hints kbd {
+        padding: 2px 6px;
+        background: #2A2E39;
+        border-radius: 3px;
+        font-size: 11px;
+        font-family: monospace;
+      }
+
+      .symbol-search-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 64px 0;
+        color: #787B86;
+      }
+
+      .symbol-search-empty svg {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 12px;
+        opacity: 0.5;
+      }
+
+      .symbol-search-empty p {
+        font-size: 14px;
+        margin: 0;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
     `;
 
     const container = document.createElement('div');
+    container.className = 'wrapper';
     container.innerHTML = `
       <div class="toolbar">
         <div class="toolbar-group">
-          <button class="toolbar-button symbol-button">${this.getAttribute('symbol') || 'SYMBOL'}</button>
+          <button class="toolbar-button symbol-button" aria-label="Symbol Search">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
+              <path fill="currentColor" d="M3.5 8a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM8 2a6 6 0 1 0 3.65 10.76l3.58 3.58 1.06-1.06-3.57-3.57A6 6 0 0 0 8 2Z"></path>
+            </svg>
+            <span style="text-transform: uppercase;">${this.getAttribute('symbol') || 'SYMBOL'}</span>
+          </button>
         </div>
 
         <div class="separator"></div>
@@ -1046,12 +1461,9 @@ class OakViewChart extends HTMLElement {
         <div class="separator"></div>
 
         <div class="toolbar-group dropdown">
-          <button class="toolbar-button chart-style-button">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" fill="currentColor">
-              <path d="M17 11v6h3v-6h-3zm-.5-1h4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5v-7a.5.5 0 0 1 .5-.5z"></path>
-              <path d="M18 7h1v3.5h-1zm0 10.5h1V21h-1z"></path>
-              <path d="M9 8v12h3V8H9zm-.5-1h4a.5.5 0 0 1 .5.5v13a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5z"></path>
-              <path d="M10 4h1v3.5h-1zm0 16.5h1V24h-1z"></path>
+          <button class="toolbar-button chart-style-button icon-only" aria-label="Chart Type">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+              <path fill="currentColor" d="M19 6h-1v7h-3v1h3v8h1v-3h3v-1h-3V6ZM11 7h-1v13H7v1h3v2h1V10h3V9h-3V7Z"></path>
             </svg>
           </button>
           <div class="chart-style-dropdown-menu dropdown-menu">
@@ -1131,8 +1543,79 @@ class OakViewChart extends HTMLElement {
 
         <div class="separator"></div>
 
+        <div class="toolbar-group dropdown">
+          <button class="toolbar-button layout-button icon-only" aria-label="Layout">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+              <path fill="currentColor" fill-rule="evenodd" d="M8 7h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM6 8c0-1.1.9-2 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8zm11-1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zm-2 1c0-1.1.9-2 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2V8zm-4 8H8a1 1 0 0 0-1 1v3a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1zm-3-1a2 2 0 0 0-2 2v3c0 1.1.9 2 2 2h3a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H8zm9 1h3a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1zm-2 1c0-1.1.9-2 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2v-3z"></path>
+            </svg>
+          </button>
+          <div class="layout-dropdown-menu dropdown-menu">
+            <div class="dropdown-item" data-layout="single">
+              <span class="dropdown-item-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="3" width="18" height="18" rx="1"></rect>
+                </svg>
+              </span>
+              <span class="dropdown-item-label">Single</span>
+            </div>
+            <div class="dropdown-separator"></div>
+            <div class="dropdown-item" data-layout="2x1">
+              <span class="dropdown-item-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="3" width="8" height="18" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="13" y="3" width="8" height="18" rx="1"></rect>
+                </svg>
+              </span>
+              <span class="dropdown-item-label">2 Horizontal</span>
+            </div>
+            <div class="dropdown-item" data-layout="1x2">
+              <span class="dropdown-item-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="3" width="18" height="8" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="13" width="18" height="8" rx="1"></rect>
+                </svg>
+              </span>
+              <span class="dropdown-item-label">2 Vertical</span>
+            </div>
+            <div class="dropdown-item" data-layout="2x2">
+              <span class="dropdown-item-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="3" width="8" height="8" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="13" y="3" width="8" height="8" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="13" width="8" height="8" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="13" y="13" width="8" height="8" rx="1"></rect>
+                </svg>
+              </span>
+              <span class="dropdown-item-label">2×2 Grid</span>
+            </div>
+            <div class="dropdown-separator"></div>
+            <div class="dropdown-item" data-layout="3x1">
+              <span class="dropdown-item-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="3" width="5" height="18" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="9.5" y="3" width="5" height="18" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="16" y="3" width="5" height="18" rx="1"></rect>
+                </svg>
+              </span>
+              <span class="dropdown-item-label">3 Horizontal</span>
+            </div>
+            <div class="dropdown-item" data-layout="1x3">
+              <span class="dropdown-item-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="3" width="18" height="5" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="9.5" width="18" height="5" rx="1"></rect>
+                  <rect stroke="currentColor" stroke-width="1.5" x="3" y="16" width="18" height="5" rx="1"></rect>
+                </svg>
+              </span>
+              <span class="dropdown-item-label">3 Vertical</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
         <div class="toolbar-group">
-          <button class="toolbar-button indicators-button">
+          <button class="toolbar-button indicators-button" aria-label="Indicators, metrics, and strategies">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28" fill="none">
               <path stroke="currentColor" d="M6 12l4.8-4.8a1 1 0 0 1 1.4 0l2.7 2.7a1 1 0 0 0 1.3.1L23 5"></path>
               <path fill="currentColor" fill-rule="evenodd" d="M19 12a1 1 0 0 0-1 1v4h-3v-1a1 1 0 0 0-1-1h-3a1 1 0 0 0-1 1v2H7a1 1 0 0 0-1 1v4h17V13a1 1 0 0 0-1-1h-3zm0 10h3v-9h-3v9zm-1 0v-4h-3v4h3zm-4-4.5V22h-3v-6h3v1.5zM10 22v-3H7v3h3z"></path>
@@ -1298,6 +1781,49 @@ class OakViewChart extends HTMLElement {
         </div>
         <div class="sidebar-right"></div>
       </div>
+
+      <!-- Symbol Search Modal -->
+      <div class="symbol-search-modal">
+        <div class="symbol-search-content">
+          <!-- Header -->
+          <div class="symbol-search-header">
+            <h2>Symbol Search</h2>
+            <button class="symbol-search-close">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Search Input -->
+          <div class="symbol-search-input-wrapper">
+            <svg class="search-icon" width="20" height="20" fill="none" viewBox="0 0 24 24">
+              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <input type="text" class="symbol-search-input" placeholder="Search symbols..." />
+          </div>
+
+          <!-- Categories -->
+          <div class="symbol-search-categories">
+            <button class="category-btn active" data-category="recent">Recent</button>
+            <button class="category-btn" data-category="popular">Popular</button>
+            <button class="category-btn" data-category="stocks">Stocks</button>
+            <button class="category-btn" data-category="etfs">ETFs</button>
+          </div>
+
+          <!-- Symbols List -->
+          <div class="symbol-search-list"></div>
+
+          <!-- Footer -->
+          <div class="symbol-search-footer">
+            <span class="symbol-count">0 symbols found</span>
+            <div class="symbol-search-hints">
+              <span><kbd>↵</kbd> to select</span>
+              <span><kbd>esc</kbd> to close</span>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
 
     this.shadowRoot.append(style, container);
@@ -1415,6 +1941,10 @@ class OakViewChart extends HTMLElement {
         if (intervalMenu) {
           intervalMenu.classList.remove('show');
         }
+        const layoutMenu = this.shadowRoot.querySelector('.layout-dropdown-menu');
+        if (layoutMenu) {
+          layoutMenu.classList.remove('show');
+        }
       }
     });
 
@@ -1448,6 +1978,55 @@ class OakViewChart extends HTMLElement {
         star.classList.toggle('checked');
       });
     });
+
+    // Layout dropdown
+    const layoutBtn = this.shadowRoot.querySelector('.layout-button');
+    const layoutMenu = this.shadowRoot.querySelector('.layout-dropdown-menu');
+
+    if (layoutBtn && layoutMenu) {
+      layoutBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+
+        if (layoutMenu.classList.contains('show')) {
+          layoutMenu.classList.remove('show');
+        } else {
+          // Close other dropdowns
+          styleMenu.classList.remove('show');
+          if (intervalMenu) {
+            intervalMenu.classList.remove('show');
+          }
+
+          // Position the dropdown
+          const btnRect = layoutBtn.getBoundingClientRect();
+          layoutMenu.style.top = `${btnRect.bottom}px`;
+          layoutMenu.style.left = `${btnRect.left}px`;
+          layoutMenu.classList.add('show');
+        }
+      });
+
+      // Layout selection
+      layoutMenu.querySelectorAll('.dropdown-item[data-layout]').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+
+          // Remove active from all items
+          layoutMenu.querySelectorAll('.dropdown-item').forEach(i => {
+            i.classList.remove('active');
+          });
+          item.classList.add('active');
+
+          const layout = item.dataset.layout;
+          layoutMenu.classList.remove('show');
+
+          // Dispatch custom event that parent can listen to
+          this.dispatchEvent(new CustomEvent('layout-change', {
+            detail: { layout },
+            bubbles: true,
+            composed: true
+          }));
+        });
+      });
+    }
 
     // Indicators button - opens modal
     const indicatorsBtn = this.shadowRoot.querySelector('.indicators-button');
@@ -1488,6 +2067,9 @@ class OakViewChart extends HTMLElement {
     searchInput.addEventListener('input', (e) => {
       this.searchIndicators(e.target.value);
     });
+
+    // Symbol Search Modal
+    this.setupSymbolSearch();
 
     // Indicator list items - clicking adds indicator
     this.shadowRoot.querySelectorAll('.indicator-list-item').forEach(item => {
@@ -1533,18 +2115,245 @@ class OakViewChart extends HTMLElement {
     });
   }
 
+  setupSymbolSearch() {
+    const POPULAR_SYMBOLS = [
+      { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
+      { symbol: 'TSLA', name: 'Tesla, Inc.', exchange: 'NASDAQ' },
+      { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
+      { symbol: 'GOOGL', name: 'Alphabet Inc.', exchange: 'NASDAQ' },
+      { symbol: 'AMZN', name: 'Amazon.com, Inc.', exchange: 'NASDAQ' },
+      { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ' },
+      { symbol: 'META', name: 'Meta Platforms, Inc.', exchange: 'NASDAQ' },
+      { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE Arca' },
+      { symbol: 'QQQ', name: 'Invesco QQQ Trust', exchange: 'NASDAQ' },
+      { symbol: 'AMD', name: 'Advanced Micro Devices, Inc.', exchange: 'NASDAQ' },
+    ];
+
+    const modal = this.shadowRoot.querySelector('.symbol-search-modal');
+    const symbolBtn = this.shadowRoot.querySelector('.symbol-button');
+    const closeBtn = this.shadowRoot.querySelector('.symbol-search-close');
+    const searchInput = this.shadowRoot.querySelector('.symbol-search-input');
+    const symbolList = this.shadowRoot.querySelector('.symbol-search-list');
+    const symbolCount = this.shadowRoot.querySelector('.symbol-count');
+    const categoryBtns = this.shadowRoot.querySelectorAll('.category-btn');
+
+    let currentCategory = 'recent';
+    let recentSymbols = ['SPX', 'AAPL', 'TSLA']; // Could be loaded from localStorage
+
+    // Open modal when clicking symbol button
+    symbolBtn.addEventListener('click', () => {
+      modal.classList.add('show');
+      setTimeout(() => searchInput.focus(), 100);
+      renderSymbols();
+    });
+
+    // Close modal
+    const closeModal = () => {
+      modal.classList.remove('show');
+      searchInput.value = '';
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+
+    // Handle Escape key
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      } else if (e.key === 'Enter') {
+        const firstItem = symbolList.querySelector('.symbol-item');
+        if (firstItem) {
+          const symbol = firstItem.dataset.symbol;
+          selectSymbol(symbol);
+        }
+      }
+    });
+
+    // Category selection
+    categoryBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        categoryBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentCategory = btn.dataset.category;
+        renderSymbols();
+      });
+    });
+
+    // Search input
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        renderSymbols();
+      }, 200);
+    });
+
+    // Select symbol
+    const selectSymbol = (symbol) => {
+      this.setAttribute('symbol', symbol);
+
+      // Add to recent symbols
+      recentSymbols = [symbol, ...recentSymbols.filter(s => s !== symbol)].slice(0, 10);
+
+      // Dispatch symbol-change event
+      this.dispatchEvent(new CustomEvent('symbol-change', {
+        detail: { symbol, interval: '1D' },
+        bubbles: true,
+        composed: true
+      }));
+
+      // Dispatch data-request event (can be prevented for manual handling)
+      const dataRequestEvent = new CustomEvent('data-request', {
+        detail: { symbol, interval: '1D' },
+        bubbles: true,
+        composed: true,
+        cancelable: true
+      });
+
+      this.dispatchEvent(dataRequestEvent);
+
+      // If event not prevented and we have a data provider, use it
+      if (!dataRequestEvent.defaultPrevented && this._dataProvider) {
+        this._dataProvider.fetchHistorical(symbol, '1D')
+          .then(data => {
+            this.setData(data);
+          })
+          .catch(error => {
+            console.error('Failed to load symbol data:', error);
+          });
+      }
+
+      closeModal();
+    };
+
+    // Render symbols list
+    const renderSymbols = async () => {
+      const searchTerm = searchInput.value.toUpperCase();
+      let symbols;
+
+      if (searchTerm.length >= 2) {
+        // Try to use data provider for search if available
+        if (this._dataProvider && typeof this._dataProvider.searchSymbols === 'function') {
+          try {
+            symbols = await this._dataProvider.searchSymbols(searchTerm);
+          } catch (error) {
+            console.error('Symbol search failed:', error);
+            symbols = POPULAR_SYMBOLS.filter(s =>
+              s.symbol.includes(searchTerm) || s.name.toUpperCase().includes(searchTerm)
+            );
+          }
+        } else {
+          // Fallback to filtering popular symbols
+          symbols = POPULAR_SYMBOLS.filter(s =>
+            s.symbol.includes(searchTerm) || s.name.toUpperCase().includes(searchTerm)
+          );
+        }
+      } else if (currentCategory === 'recent') {
+        symbols = recentSymbols.map(sym => ({
+          symbol: sym,
+          name: sym,
+          exchange: 'Recent'
+        }));
+      } else if (currentCategory === 'popular') {
+        symbols = POPULAR_SYMBOLS;
+      } else {
+        symbols = POPULAR_SYMBOLS;
+      }
+
+      const currentSymbol = this.getAttribute('symbol');
+
+      if (symbols.length === 0) {
+        symbolList.innerHTML = `
+          <div class="symbol-search-empty">
+            <svg fill="none" viewBox="0 0 24 24">
+              <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <p>${searchTerm ? 'No symbols found' : 'No symbols available'}</p>
+          </div>
+        `;
+      } else {
+        symbolList.innerHTML = symbols.map(item => {
+          const isActive = currentSymbol === item.symbol;
+          return `
+            <button class="symbol-item ${isActive ? 'active' : ''}" data-symbol="${item.symbol}">
+              <div class="symbol-item-info">
+                <div class="symbol-item-icon">${item.symbol.charAt(0)}</div>
+                <div class="symbol-item-details">
+                  <div class="symbol-item-symbol">
+                    ${item.symbol}
+                    ${isActive ? '<span class="symbol-item-badge">Active</span>' : ''}
+                  </div>
+                  <div class="symbol-item-name">
+                    <span>${item.name}</span>
+                    <span>•</span>
+                    <span>${item.exchange}</span>
+                  </div>
+                </div>
+              </div>
+              <svg class="symbol-item-arrow" fill="none" viewBox="0 0 24 24">
+                <path d="M9 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          `;
+        }).join('');
+
+        // Add click handlers to symbol items
+        symbolList.querySelectorAll('.symbol-item').forEach(item => {
+          item.addEventListener('click', () => {
+            selectSymbol(item.dataset.symbol);
+          });
+        });
+      }
+
+      symbolCount.textContent = `${symbols.length} symbol${symbols.length !== 1 ? 's' : ''} found`;
+    };
+
+    // Initial render
+    renderSymbols();
+  }
+
   initChart() {
     const container = this.shadowRoot.querySelector('.chart-container');
+    const host = this.shadowRoot.host;
 
-    // Get dimensions
-    const width = container.clientWidth || 800;
-    const height = container.clientHeight || 600;
+    console.log('=== CHART INIT DEBUG ===');
+    console.log('Host element:', host);
+    console.log('Host size:', host.clientWidth, 'x', host.clientHeight);
+    console.log('Host computed style:', window.getComputedStyle(host).display, window.getComputedStyle(host).height);
+    console.log('Container element:', container);
+    console.log('Container size:', container.clientWidth, 'x', container.clientHeight);
+    console.log('Container computed style:', window.getComputedStyle(container).display, window.getComputedStyle(container).height);
+    console.log('Container flex:', window.getComputedStyle(container).flex);
+    console.log('Container parent:', container.parentElement);
+    console.log('Parent computed style:', window.getComputedStyle(container.parentElement).display, window.getComputedStyle(container.parentElement).flexDirection);
+    console.log('Parent size:', container.parentElement.clientWidth, 'x', container.parentElement.clientHeight);
+    const mainContent = container.parentElement.parentElement;
+    console.log('Main-content:', mainContent);
+    console.log('Main-content size:', mainContent.clientWidth, 'x', mainContent.clientHeight);
+    console.log('Main-content computed:', window.getComputedStyle(mainContent).display, window.getComputedStyle(mainContent).flex);
 
-    console.log('Chart container size:', width, height);
+    // Check if container has zero height
+    if (container.clientHeight === 0) {
+      console.warn('⚠️ Container has ZERO height! Chart may not display properly.');
+      console.log('Waiting for next frame and retrying...');
+
+      // Try again after another frame
+      requestAnimationFrame(() => {
+        console.log('=== RETRY CHART INIT ===');
+        console.log('Container size after wait:', container.clientWidth, 'x', container.clientHeight);
+        if (container.clientHeight === 0) {
+          console.error('❌ Container STILL has zero height after waiting!');
+        }
+      });
+    }
 
     const chartOptions = {
-      width: width,
-      height: height,
+      autoSize: true,
       layout: {
         background: { color: this.theme === 'light' ? '#FFFFFF' : '#1E222D' },
         textColor: this.theme === 'light' ? '#191919' : '#D9D9D9',
@@ -1560,6 +2369,8 @@ class OakViewChart extends HTMLElement {
         borderColor: this.theme === 'light' ? '#E1E3E6' : '#2B2B43',
       },
       timeScale: {
+        visible: true,
+        borderVisible: false,
         borderColor: this.theme === 'light' ? '#E1E3E6' : '#2B2B43',
         timeVisible: true,
         secondsVisible: false,
@@ -1567,7 +2378,8 @@ class OakViewChart extends HTMLElement {
     };
 
     this._chart = createChart(container, chartOptions);
-    console.log('Chart created:', this._chart);
+    console.log('✓ Chart created with autoSize');
+    console.log('=== END CHART INIT ===');
 
     this.dispatchEvent(new CustomEvent('chart-ready', {
       detail: { chart: this._chart }
@@ -1575,9 +2387,19 @@ class OakViewChart extends HTMLElement {
   }
 
   updateChartType() {
-    if (!this._chart || !this._data || this._data.length === 0) return;
+    console.log('=== updateChartType called ===');
+    console.log('Chart exists:', !!this._chart);
+    console.log('Data exists:', !!this._data);
+    console.log('Data length:', this._data?.length || 0);
+    console.log('Current chart type:', this._currentChartType);
+
+    if (!this._chart || !this._data || this._data.length === 0) {
+      console.warn('⚠️ Cannot update chart type - missing chart or data');
+      return;
+    }
 
     this.clearSeries();
+    console.log('Adding series for type:', this._currentChartType);
 
     switch(this._currentChartType) {
       case 'candlestick':

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
+  root: 'example',
   build: {
     lib: {
       entry: resolve(__dirname, 'src/oakview-chart.js'),

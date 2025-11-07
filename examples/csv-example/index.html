@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OakView CSV Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #131722;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #d1d4dc;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1e222d;
+      padding: 16px 24px;
+      border-bottom: 1px solid #2a2e39;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .info {
+      font-size: 14px;
+      color: #787b86;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    select, button {
+      background: #2a2e39;
+      color: #d1d4dc;
+      border: 1px solid #363a45;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    select:hover, button:hover {
+      background: #363a45;
+      border-color: #434651;
+    }
+
+    select:focus, button:focus {
+      outline: none;
+      border-color: #2962ff;
+    }
+
+    button.primary {
+      background: #2962ff;
+      border-color: #2962ff;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    button.primary:hover {
+      background: #1e53e5;
+    }
+
+    .chart-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    oakview-chart-layout {
+      width: 100%;
+      height: 100%;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 10;
+    }
+
+    .loading.hidden {
+      display: none;
+    }
+
+    .spinner {
+      border: 3px solid #2a2e39;
+      border-top: 3px solid #2962ff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #f23645;
+      color: #ffffff;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 20;
+      display: none;
+    }
+
+    .error.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>OakView CSV Example</h1>
+      <div class="info">Loading historical data from CSV files</div>
+    </div>
+    <div class="controls">
+      <select id="symbolSelect">
+        <option value="AAPL">AAPL</option>
+        <option value="GOOGL">GOOGL</option>
+        <option value="MSFT">MSFT</option>
+        <option value="SPX" selected>SPX</option>
+      </select>
+      <select id="intervalSelect">
+        <option value="1">1 Min</option>
+        <option value="5">5 Min</option>
+        <option value="15">15 Min</option>
+        <option value="1D" selected>1 Day</option>
+        <option value="1W">1 Week</option>
+      </select>
+      <button id="loadBtn" class="primary">Load Data</button>
+    </div>
+  </header>
+
+  <div class="chart-container">
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <div>Loading chart data...</div>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <oakview-chart-layout
+      id="chart"
+      layout="single"
+      symbol="SPX"
+      theme="dark">
+    </oakview-chart-layout>
+  </div>
+
+  <script type="module">
+    // Import OakView components
+    import '../../src/oakview-chart-layout.js';
+
+    // Get DOM elements
+    const chart = document.getElementById('chart');
+    const symbolSelect = document.getElementById('symbolSelect');
+    const intervalSelect = document.getElementById('intervalSelect');
+    const loadBtn = document.getElementById('loadBtn');
+    const loading = document.getElementById('loading');
+    const errorDiv = document.getElementById('error');
+
+    // Load and display data
+    function loadData() {
+      const symbol = symbolSelect.value;
+      const interval = intervalSelect.value;
+
+      // Build the CSV file path
+      const dataSource = `./data/${symbol}_${interval}.csv`;
+
+      console.log(`Loading ${symbol} @ ${interval} from ${dataSource}`);
+
+      // Show loading indicator
+      loading.classList.remove('hidden');
+      errorDiv.classList.remove('show');
+
+      try {
+        // Update chart attributes to load new data
+        chart.setAttribute('symbol', symbol);
+        chart.setAttribute('data-source', dataSource);
+
+        // Hide loading indicator after a short delay
+        setTimeout(() => {
+          loading.classList.add('hidden');
+          console.log('✓ Chart loaded successfully');
+        }, 500);
+
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        loading.classList.add('hidden');
+        showError(`Failed to load data: ${error.message}`);
+      }
+    }
+
+    // Show error message
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.add('show');
+
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        errorDiv.classList.remove('show');
+      }, 5000);
+    }
+
+    // Event listeners
+    loadBtn.addEventListener('click', loadData);
+
+    symbolSelect.addEventListener('change', () => {
+      // Auto-load on symbol change
+      loadData();
+    });
+
+    intervalSelect.addEventListener('change', () => {
+      // Auto-load on interval change
+      loadData();
+    });
+
+    // Listen for layout changes
+    window.addEventListener('layout-change', (event) => {
+      console.log('Layout change requested:', event.detail.layout);
+      chart.setLayout(event.detail.layout);
+    });
+
+    // Load initial data on page load
+    loadData();
+  </script>
+</body>
+</html>

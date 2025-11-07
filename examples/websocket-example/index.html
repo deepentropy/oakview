@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OakView WebSocket Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #131722;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #d1d4dc;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1e222d;
+      padding: 16px 24px;
+      border-bottom: 1px solid #2a2e39;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .info {
+      font-size: 14px;
+      color: #787b86;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #787b86;
+    }
+
+    .status.connected {
+      background: #4caf50;
+      box-shadow: 0 0 8px #4caf50;
+    }
+
+    .status.disconnected {
+      background: #f23645;
+    }
+
+    .status.connecting {
+      background: #ff9800;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input, select, button {
+      background: #2a2e39;
+      color: #d1d4dc;
+      border: 1px solid #363a45;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    input {
+      width: 150px;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #2962ff;
+    }
+
+    button {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      background: #363a45;
+      border-color: #434651;
+    }
+
+    button.primary {
+      background: #2962ff;
+      border-color: #2962ff;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    button.primary:hover {
+      background: #1e53e5;
+    }
+
+    button.danger {
+      background: #f23645;
+      border-color: #f23645;
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    button.danger:hover {
+      background: #cc2f3c;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .chart-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    oakview-chart-layout {
+      width: 100%;
+      height: 100%;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 10;
+      background: rgba(30, 34, 45, 0.95);
+      padding: 24px 32px;
+      border-radius: 8px;
+      border: 1px solid #2a2e39;
+    }
+
+    .loading.hidden {
+      display: none;
+    }
+
+    .spinner {
+      border: 3px solid #2a2e39;
+      border-top: 3px solid #2962ff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .notification {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: #1e222d;
+      border: 1px solid #2a2e39;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 20;
+      display: none;
+      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .notification.show {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .notification.error {
+      border-left: 4px solid #f23645;
+    }
+
+    .notification.success {
+      border-left: 4px solid #4caf50;
+    }
+
+    .notification.info {
+      border-left: 4px solid #2962ff;
+    }
+
+    .stats {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(30, 34, 45, 0.95);
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid #2a2e39;
+      font-size: 12px;
+      color: #787b86;
+      z-index: 5;
+    }
+
+    .stats div {
+      margin: 4px 0;
+    }
+
+    .stats .label {
+      display: inline-block;
+      width: 120px;
+    }
+
+    .stats .value {
+      color: #d1d4dc;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>OakView WebSocket Example</h1>
+      <div class="info">
+        <span class="status" id="connectionStatus"></span>
+        <span id="connectionText">Disconnected</span>
+      </div>
+    </div>
+    <div class="controls">
+      <input
+        type="text"
+        id="symbolInput"
+        placeholder="Symbol (e.g., AAPL)"
+        value="AAPL">
+      <select id="intervalSelect">
+        <option value="1">1 Min</option>
+        <option value="5">5 Min</option>
+        <option value="15">15 Min</option>
+        <option value="30">30 Min</option>
+        <option value="60">1 Hour</option>
+        <option value="1D" selected>1 Day</option>
+        <option value="1W">1 Week</option>
+      </select>
+      <button id="connectBtn" class="primary">Connect</button>
+      <button id="disconnectBtn" class="danger" disabled>Disconnect</button>
+    </div>
+  </header>
+
+  <div class="chart-container">
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <div>Connecting to WebSocket...</div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <div class="stats">
+      <div><span class="label">Symbol:</span> <span class="value" id="statSymbol">-</span></div>
+      <div><span class="label">Interval:</span> <span class="value" id="statInterval">-</span></div>
+      <div><span class="label">Historical Bars:</span> <span class="value" id="statBars">-</span></div>
+      <div><span class="label">Updates Received:</span> <span class="value" id="statUpdates">0</span></div>
+      <div><span class="label">Last Update:</span> <span class="value" id="statLastUpdate">-</span></div>
+    </div>
+
+    <oakview-chart-layout
+      id="chart"
+      layout="single"
+      theme="dark">
+    </oakview-chart-layout>
+  </div>
+
+  <script type="module">
+    // Import OakView components
+    import '../../src/oakview-chart-layout.js';
+
+    // Import custom WebSocket provider (you'll need to implement this)
+    // import CustomWebSocketProvider from './providers/custom-websocket-provider.js';
+
+    // For this demo, we'll create a mock provider that simulates WebSocket behavior
+    import OakViewDataProvider from '../../src/data-providers/base.js';
+
+    // Mock WebSocket Provider (replace with your actual provider)
+    class MockWebSocketProvider extends OakViewDataProvider {
+      constructor(config) {
+        super();
+        this.config = config;
+        this.subscriptions = new Map();
+        this.connected = false;
+        this.updateInterval = null;
+      }
+
+      async initialize() {
+        console.log('Initializing mock WebSocket provider...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        this.connected = true;
+        console.log('Mock WebSocket connected');
+      }
+
+      async fetchHistorical(symbol, interval, from, to) {
+        console.log(`Fetching historical data: ${symbol} @ ${interval}`);
+
+        // Generate mock historical data
+        const bars = [];
+        const now = Math.floor(Date.now() / 1000);
+        const intervalSeconds = this.intervalToSeconds(interval);
+        const numBars = 100;
+
+        let basePrice = 150 + Math.random() * 50;
+
+        for (let i = numBars; i >= 0; i--) {
+          const time = now - (i * intervalSeconds);
+          const change = (Math.random() - 0.5) * 2;
+          const open = basePrice;
+          const close = basePrice + change;
+          const high = Math.max(open, close) + Math.random() * 1;
+          const low = Math.min(open, close) - Math.random() * 1;
+
+          bars.push({
+            time: time,
+            open: parseFloat(open.toFixed(2)),
+            high: parseFloat(high.toFixed(2)),
+            low: parseFloat(low.toFixed(2)),
+            close: parseFloat(close.toFixed(2)),
+            volume: Math.floor(1000000 + Math.random() * 5000000)
+          });
+
+          basePrice = close;
+        }
+
+        return bars;
+      }
+
+      subscribe(symbol, interval, callback) {
+        const subscriptionId = `${symbol}_${interval}_${Date.now()}`;
+        console.log(`Subscribing to real-time data: ${symbol} @ ${interval}`);
+
+        const subscription = {
+          symbol,
+          interval,
+          callback,
+          lastBar: null
+        };
+
+        this.subscriptions.set(subscriptionId, subscription);
+
+        // Simulate real-time updates
+        if (!this.updateInterval) {
+          this.startUpdates();
+        }
+
+        return () => this.unsubscribe(subscriptionId);
+      }
+
+      startUpdates() {
+        this.updateInterval = setInterval(() => {
+          const now = Math.floor(Date.now() / 1000);
+
+          for (const [id, sub] of this.subscriptions) {
+            const barTime = this.getBarTime(now, sub.interval);
+
+            if (!sub.lastBar || sub.lastBar.time !== barTime) {
+              // New bar
+              const price = 150 + Math.random() * 50;
+              sub.lastBar = {
+                time: barTime,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+                volume: 0
+              };
+            } else {
+              // Update current bar
+              const change = (Math.random() - 0.5) * 0.5;
+              sub.lastBar.close = parseFloat((sub.lastBar.close + change).toFixed(2));
+              sub.lastBar.high = Math.max(sub.lastBar.high, sub.lastBar.close);
+              sub.lastBar.low = Math.min(sub.lastBar.low, sub.lastBar.close);
+              sub.lastBar.volume += Math.floor(Math.random() * 10000);
+            }
+
+            sub.callback({ ...sub.lastBar });
+          }
+        }, 1000); // Update every second
+      }
+
+      unsubscribe(subscriptionId) {
+        console.log('Unsubscribing:', subscriptionId);
+        this.subscriptions.delete(subscriptionId);
+
+        if (this.subscriptions.size === 0 && this.updateInterval) {
+          clearInterval(this.updateInterval);
+          this.updateInterval = null;
+        }
+      }
+
+      disconnect() {
+        console.log('Disconnecting...');
+        this.connected = false;
+        if (this.updateInterval) {
+          clearInterval(this.updateInterval);
+          this.updateInterval = null;
+        }
+        this.subscriptions.clear();
+      }
+
+      getBarTime(timestamp, interval) {
+        const intervalSeconds = this.intervalToSeconds(interval);
+        return Math.floor(timestamp / intervalSeconds) * intervalSeconds;
+      }
+
+      intervalToSeconds(interval) {
+        if (interval.endsWith('D')) return 86400;
+        if (interval.endsWith('W')) return 604800;
+        if (interval.endsWith('M')) return 2592000;
+        return parseInt(interval) * 60;
+      }
+    }
+
+    // Get DOM elements
+    const chart = document.getElementById('chart');
+    const symbolInput = document.getElementById('symbolInput');
+    const intervalSelect = document.getElementById('intervalSelect');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const loading = document.getElementById('loading');
+    const notification = document.getElementById('notification');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const connectionText = document.getElementById('connectionText');
+
+    // Stats elements
+    const statSymbol = document.getElementById('statSymbol');
+    const statInterval = document.getElementById('statInterval');
+    const statBars = document.getElementById('statBars');
+    const statUpdates = document.getElementById('statUpdates');
+    const statLastUpdate = document.getElementById('statLastUpdate');
+
+    let provider = null;
+    let unsubscribe = null;
+    let updateCount = 0;
+
+    // Update connection status
+    function setConnectionStatus(status) {
+      connectionStatus.className = `status ${status}`;
+
+      if (status === 'connected') {
+        connectionText.textContent = 'Connected';
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+      } else if (status === 'connecting') {
+        connectionText.textContent = 'Connecting...';
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = true;
+      } else {
+        connectionText.textContent = 'Disconnected';
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+      }
+    }
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+      notification.textContent = message;
+      notification.className = `notification ${type} show`;
+
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 5000);
+    }
+
+    // Connect and load data
+    async function connect() {
+      const symbol = symbolInput.value.trim().toUpperCase();
+      const interval = intervalSelect.value;
+
+      if (!symbol) {
+        showNotification('Please enter a symbol', 'error');
+        return;
+      }
+
+      setConnectionStatus('connecting');
+      loading.classList.remove('hidden');
+      updateCount = 0;
+
+      try {
+        // Create provider instance
+        provider = new MockWebSocketProvider({
+          wsUrl: 'wss://your-websocket-endpoint.com/stream',
+          apiUrl: 'https://your-api-endpoint.com/api'
+        });
+
+        // Initialize connection
+        await provider.initialize();
+        setConnectionStatus('connected');
+        showNotification('Connected successfully', 'success');
+
+        // Set provider on chart
+        chart.setDataProvider(provider);
+        chart.setAttribute('symbol', symbol);
+        chart.setAttribute('interval', interval);
+
+        // Load historical data
+        const data = await provider.fetchHistorical(symbol, interval);
+        console.log('Loaded', data.length, 'bars');
+
+        // Update stats
+        statSymbol.textContent = symbol;
+        statInterval.textContent = interval;
+        statBars.textContent = data.length;
+
+        // Subscribe to real-time updates
+        unsubscribe = provider.subscribe(symbol, interval, (bar) => {
+          updateCount++;
+          statUpdates.textContent = updateCount;
+          statLastUpdate.textContent = new Date().toLocaleTimeString();
+        });
+
+        loading.classList.add('hidden');
+        showNotification(`Loaded ${data.length} bars for ${symbol}`, 'success');
+
+      } catch (error) {
+        console.error('Connection failed:', error);
+        setConnectionStatus('disconnected');
+        loading.classList.add('hidden');
+        showNotification(`Connection failed: ${error.message}`, 'error');
+      }
+    }
+
+    // Disconnect
+    function disconnect() {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+
+      if (provider) {
+        provider.disconnect();
+        provider = null;
+      }
+
+      setConnectionStatus('disconnected');
+      showNotification('Disconnected', 'info');
+
+      // Reset stats
+      statSymbol.textContent = '-';
+      statInterval.textContent = '-';
+      statBars.textContent = '-';
+      statUpdates.textContent = '0';
+      statLastUpdate.textContent = '-';
+      updateCount = 0;
+    }
+
+    // Event listeners
+    connectBtn.addEventListener('click', connect);
+    disconnectBtn.addEventListener('click', disconnect);
+
+    symbolInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        if (provider && provider.connected) {
+          disconnect();
+          setTimeout(connect, 100);
+        } else {
+          connect();
+        }
+      }
+    });
+
+    intervalSelect.addEventListener('change', () => {
+      if (provider && provider.connected) {
+        disconnect();
+        setTimeout(connect, 100);
+      }
+    });
+
+    // Listen for layout changes
+    window.addEventListener('layout-change', (event) => {
+      console.log('Layout change requested:', event.detail.layout);
+      chart.setLayout(event.detail.layout);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      disconnect();
+    });
+
+    // Initial status
+    setConnectionStatus('disconnected');
+  </script>
+</body>
+</html>

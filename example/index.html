@@ -17,23 +17,31 @@
             height: 100vh;
         }
 
-        oakview-chart {
+        oakview-chart-layout {
             width: 100%;
             height: 100vh;
         }
     </style>
 </head>
 <body>
-    <oakview-chart
-        id="chart1"
+    <oakview-chart-layout
+        id="chartLayout"
+        layout="single"
         symbol="SPX"
         theme="dark"
-        show-toolbar="true"
         data-source="SP_SPX, 1D.csv">
-    </oakview-chart>
+    </oakview-chart-layout>
 
     <script type="module">
-        import '../src/oakview-chart-ui.js';
+        import '../src/oakview-chart-layout.js';
+
+        // Listen for layout changes from any chart's toolbar
+        const layoutComponent = document.getElementById('chartLayout');
+
+        window.addEventListener('layout-change', (event) => {
+            console.log('Layout change requested:', event.detail.layout);
+            layoutComponent.setLayout(event.detail.layout);
+        });
     </script>
 </body>
 </html>

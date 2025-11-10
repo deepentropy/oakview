@@ -17,89 +17,29 @@
       color: #d1d4dc;
       overflow: hidden;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      background: #1e222d;
-      padding: 16px 24px;
-      border-bottom: 1px solid #2a2e39;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      color: #ffffff;
-    }
-
-    .info {
-      font-size: 14px;
-      color: #787b86;
-    }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    select, button {
-      background: #2a2e39;
-      color: #d1d4dc;
-      border: 1px solid #363a45;
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    select:hover, button:hover {
-      background: #363a45;
-      border-color: #434651;
-    }
-
-    select:focus, button:focus {
-      outline: none;
-      border-color: #2962ff;
-    }
-
-    button.primary {
-      background: #2962ff;
-      border-color: #2962ff;
-      color: #ffffff;
-      font-weight: 500;
-    }
-
-    button.primary:hover {
-      background: #1e53e5;
-    }
-
-    .chart-container {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
     }
 
     oakview-chart-layout {
       width: 100%;
-      height: 100%;
+      height: 100vh;
     }
 
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 10;
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(19, 23, 34, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .loading.hidden {
+    .loading-overlay.hidden {
       display: none;
     }
 
@@ -110,7 +50,6 @@
       width: 40px;
       height: 40px;
       animation: spin 1s linear infinite;
-      margin: 0 auto 12px;
     }
 
     @keyframes spin {
@@ -118,141 +57,152 @@
       100% { transform: rotate(360deg); }
     }
 
-    .error {
-      position: absolute;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #f23645;
-      color: #ffffff;
-      padding: 12px 24px;
-      border-radius: 4px;
-      font-size: 14px;
-      z-index: 20;
-      display: none;
-    }
-
-    .error.show {
-      display: block;
-    }
   </style>
 </head>
 <body>
-  <header>
-    <div>
-      <h1>OakView CSV Example</h1>
-      <div class="info">Loading historical data from CSV files</div>
-    </div>
-    <div class="controls">
-      <select id="symbolSelect">
-        <option value="AAPL">AAPL</option>
-        <option value="GOOGL">GOOGL</option>
-        <option value="MSFT">MSFT</option>
-        <option value="SPX" selected>SPX</option>
-      </select>
-      <select id="intervalSelect">
-        <option value="1">1 Min</option>
-        <option value="5">5 Min</option>
-        <option value="15">15 Min</option>
-        <option value="1D" selected>1 Day</option>
-        <option value="1W">1 Week</option>
-      </select>
-      <button id="loadBtn" class="primary">Load Data</button>
-    </div>
-  </header>
-
-  <div class="chart-container">
-    <div id="loading" class="loading">
-      <div class="spinner"></div>
-      <div>Loading chart data...</div>
-    </div>
-
-    <div id="error" class="error"></div>
-
-    <oakview-chart-layout
-      id="chart"
-      layout="single"
-      symbol="SPX"
-      theme="dark">
-    </oakview-chart-layout>
+  <div id="loading" class="loading-overlay">
+    <div class="spinner"></div>
+    <div>Initializing CSV provider...</div>
   </div>
 
+  <oakview-chart-layout
+    id="chart"
+    layout="single"
+    symbol="QQQ"
+    theme="dark">
+  </oakview-chart-layout>
+
   <script type="module">
-    // Import OakView components
+    // Import OakView components and CSV provider
     import '../../src/oakview-chart-layout.js';
+    import CSVDataProvider from './providers/csv-provider.js';
+
+    // Available CSV files (manually list them here)
+    // In a real app, you might fetch this from a manifest file or API
+    const AVAILABLE_CSV_FILES = [
+      'SPX_1D.csv', 'QQQ_60.csv',
+      // Add more files as you create them:
+      // 'AAPL_1H.csv',
+      // 'AAPL_1D.csv',
+      // 'GOOGL_1D.csv',
+      // etc.
+    ];
 
     // Get DOM elements
     const chart = document.getElementById('chart');
-    const symbolSelect = document.getElementById('symbolSelect');
-    const intervalSelect = document.getElementById('intervalSelect');
-    const loadBtn = document.getElementById('loadBtn');
     const loading = document.getElementById('loading');
-    const errorDiv = document.getElementById('error');
 
-    // Load and display data
-    function loadData() {
-      const symbol = symbolSelect.value;
-      const interval = intervalSelect.value;
+    // Create CSV provider with available files
+    const provider = new CSVDataProvider({
+      baseUrl: './data/',
+      availableFiles: AVAILABLE_CSV_FILES
+    });
 
-      // Build the CSV file path
-      const dataSource = `./data/${symbol}_${interval}.csv`;
+    // Current state
+    let currentSymbol = 'QQQ';
+    let currentInterval = '60';
+    let currentData = null;
 
-      console.log(`Loading ${symbol} @ ${interval} from ${dataSource}`);
-
-      // Show loading indicator
-      loading.classList.remove('hidden');
-      errorDiv.classList.remove('show');
-
+    // Initialize
+    async function initialize() {
       try {
-        // Update chart attributes to load new data
-        chart.setAttribute('symbol', symbol);
-        chart.setAttribute('data-source', dataSource);
+        console.log('Initializing CSV example...');
 
-        // Hide loading indicator after a short delay
-        setTimeout(() => {
-          loading.classList.add('hidden');
-          console.log('✓ Chart loaded successfully');
-        }, 500);
+        // Initialize provider
+        await provider.initialize();
 
-      } catch (error) {
-        console.error('Failed to load data:', error);
+        // Set provider on chart
+        chart.setDataProvider(provider);
+
+        // Load initial data
+        await loadSymbol(currentSymbol, currentInterval);
+
+        // Hide loading overlay
         loading.classList.add('hidden');
-        showError(`Failed to load data: ${error.message}`);
+
+        console.log('✅ CSV example initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+        alert('Failed to initialize: ' + error.message);
       }
     }
 
-    // Show error message
-    function showError(message) {
-      errorDiv.textContent = message;
-      errorDiv.classList.add('show');
+    // Load symbol data
+    async function loadSymbol(symbol, interval) {
+      console.log(`Loading ${symbol} @ ${interval}...`);
 
-      // Auto-hide after 5 seconds
-      setTimeout(() => {
-        errorDiv.classList.remove('show');
-      }, 5000);
+      try {
+        // Get base interval for this symbol
+        const baseInterval = provider.getBaseInterval(symbol);
+        const availableIntervals = provider.getAvailableIntervals(symbol);
+        const isResampled = baseInterval !== interval && !provider.hasData(symbol, interval);
+
+        console.log('Base interval:', baseInterval);
+        console.log('Available intervals:', availableIntervals);
+        console.log('Will resample:', isResampled);
+
+        // Fetch data (will auto-resample if needed)
+        currentData = await provider.fetchHistorical(symbol, interval);
+
+        // Update ALL charts in the layout
+        const chartCount = chart.getChartCount();
+        console.log(`Updating ${chartCount} chart(s) with data`);
+
+        for (let i = 0; i < chartCount; i++) {
+          const chartElement = chart.getChartAt(i);
+          if (chartElement) {
+            console.log(`Setting data for chart ${i}`, chartElement);
+            chartElement.setData(currentData);
+            chartElement.setAttribute('symbol', symbol);
+          } else {
+            console.warn(`Chart ${i} not found!`);
+          }
+        }
+
+        console.log(`✓ Loaded ${currentData.length} bars`);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        alert(`Failed to load ${symbol}: ${error.message}`);
+      }
     }
 
-    // Event listeners
-    loadBtn.addEventListener('click', loadData);
 
-    symbolSelect.addEventListener('change', () => {
-      // Auto-load on symbol change
-      loadData();
+    // Listen for symbol changes from chart
+    chart.addEventListener('symbol-change', async (e) => {
+      console.log('Symbol changed:', e.detail);
+      currentSymbol = e.detail.symbol;
+      await loadSymbol(currentSymbol, currentInterval);
     });
 
-    intervalSelect.addEventListener('change', () => {
-      // Auto-load on interval change
-      loadData();
+    // Listen for interval changes from chart
+    chart.addEventListener('interval-change', async (e) => {
+      console.log('Interval changed:', e.detail);
+      currentInterval = e.detail.interval;
+      await loadSymbol(currentSymbol, currentInterval);
     });
 
     // Listen for layout changes
-    window.addEventListener('layout-change', (event) => {
+    window.addEventListener('layout-change', async (event) => {
       console.log('Layout change requested:', event.detail.layout);
       chart.setLayout(event.detail.layout);
+
+      // Wait for layout to update, then load data for all charts
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await loadSymbol(currentSymbol, currentInterval);
     });
 
-    // Load initial data on page load
-    loadData();
+    // Test symbol search
+    async function testSymbolSearch() {
+      const results = await provider.searchSymbols('');
+      console.log('All symbols:', results);
+
+      const spxResults = await provider.searchSymbols('SPX');
+      console.log('SPX search:', spxResults);
+    }
+
+
+    // Start the app
+    initialize();
   </script>
 </body>
 </html>

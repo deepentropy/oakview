@@ -18,3 +18,5 @@ And the indicators integration: https://tradingview.github.io/lightweight-charts
 Tradingview design: 
 - complete page with css and js: docs/design/complete/
 - image of the interface: docs/design/tradingview.png
+- design speficications: docs/tv_systematic_analysis/design_specification.md
+- icons: docs/tv_systematic_analysis/svg_icons/

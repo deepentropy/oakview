@@ -1,0 +1,289 @@
+/**
+ * OakView Design System - CSS Variables
+ * Based on TradingView Design Specification
+ *
+ * This file defines all design tokens as CSS custom properties
+ * for consistent styling across the application.
+ */
+
+:root {
+  /* ============================================
+     COLOR PALETTE
+     ============================================ */
+
+  /* Background Colors */
+  --bg-primary: #131722;
+  --bg-secondary: #1E222D;
+  --bg-tertiary: #2A2E39;
+  --bg-white: #FFFFFF;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Brand Colors */
+  --blue-primary: #2962FF;
+  --blue-hover: #1E53E5;
+  --blue-light: #3179F5;
+
+  /* Text Colors */
+  --text-primary: #D1D4DC;
+  --text-secondary: #787B86;
+  --text-tertiary: #5E616E;
+  --text-dark: #131722;
+  --text-white: #FFFFFF;
+
+  /* Market Data Colors */
+  --green-bullish: #089981;
+  --red-bearish: #F23645;
+  --green-candle: #26A69A;
+  --red-candle: #EF5350;
+
+  /* Border Colors */
+  --border-primary: #2A2E39;
+  --border-secondary: #363A45;
+  --border-light: #E0E3EB;
+  --border-focus: #2962FF;
+
+  /* Volume Bar Colors */
+  --volume-bullish: rgba(8, 153, 129, 0.5);
+  --volume-bearish: rgba(242, 54, 69, 0.5);
+
+  /* Chart Colors */
+  --grid-line: #2A2E39;
+  --axis-text: #787B86;
+  --crosshair: #787B86;
+
+  /* Badge Colors */
+  --badge-red: #F23645;
+  --badge-blue: #2962FF;
+  --badge-green: #089981;
+  --badge-yellow: #FFA726;
+  --badge-black: #131722;
+  --badge-brown: #8B4513;
+
+  /* Shadow Colors */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  /* Hover/Focus Colors */
+  --hover-bg-dark: #2A2E39;
+  --hover-bg-light: #F0F3FA;
+  --focus-ring: rgba(41, 98, 255, 0.3);
+
+  /* ============================================
+     TYPOGRAPHY SYSTEM
+     ============================================ */
+
+  /* Font Families */
+  --font-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+  /* Font Sizes */
+  --font-size-10: 10px;   /* Tiny labels */
+  --font-size-11: 11px;   /* Chart axis, timestamps */
+  --font-size-12: 12px;   /* Secondary text, descriptions */
+  --font-size-13: 13px;   /* Primary UI text */
+  --font-size-14: 14px;   /* Section headers */
+  --font-size-16: 16px;   /* Large labels, price changes */
+  --font-size-20: 20px;   /* Stock price header */
+  --font-size-32: 32px;   /* Large price display */
+
+  /* Font Weights */
+  --font-weight-regular: 400;   /* Body text */
+  --font-weight-medium: 500;    /* Buttons, labels */
+  --font-weight-semibold: 600;  /* Headers */
+  --font-weight-bold: 700;      /* Emphasis */
+
+  /* Line Heights */
+  --line-height-tight: 1.2;     /* Compact text */
+  --line-height-normal: 1.5;    /* Body text */
+  --line-height-relaxed: 1.75;  /* Spacious text */
+
+  /* ============================================
+     SPACING SYSTEM
+     ============================================ */
+
+  /* Base Spacing Unit */
+  --spacing-unit: 4px;
+
+  /* Spacing Scale */
+  --space-0: 0px;
+  --space-1: 4px;     /* 1 unit */
+  --space-2: 8px;     /* 2 units */
+  --space-3: 12px;    /* 3 units */
+  --space-4: 16px;    /* 4 units */
+  --space-5: 20px;    /* 5 units */
+  --space-6: 24px;    /* 6 units */
+  --space-8: 32px;    /* 8 units */
+  --space-10: 40px;   /* 10 units */
+  --space-12: 48px;   /* 12 units */
+  --space-16: 64px;   /* 16 units */
+
+  /* Border Radius */
+  --radius-sm: 4px;    /* Buttons, inputs */
+  --radius-md: 6px;    /* Cards, small panels */
+  --radius-lg: 8px;    /* Dropdowns, modals */
+  --radius-xl: 12px;   /* Large panels */
+  --radius-full: 50%;  /* Circular badges */
+
+  /* ============================================
+     LAYOUT DIMENSIONS
+     ============================================ */
+
+  /* Fixed Widths */
+  --toolbar-width: 48px;
+  --panel-width: 320px;
+  --dropdown-width: 232px;
+  --search-width: 200px;
+
+  /* Fixed Heights */
+  --navbar-height: 44px;
+  --header-height: 70px;
+  --list-item-height: 44px;
+  --button-height: 32px;
+  --timeline-height: 32px;
+  --column-header-height: 32px;
+  --bottom-bar-height: 29px;
+
+  /* Component Dimensions */
+  --menu-button-size: 40px;
+  --icon-button-size: 32px;
+  --watchlist-button-size: 28px;
+
+  /* ============================================
+     COMPONENT-SPECIFIC SPACING
+     ============================================ */
+
+  /* Button Padding */
+  --btn-padding-sm: 6px 12px;
+  --btn-padding-md: 8px 16px;
+  --btn-padding-lg: 12px 24px;
+
+  /* Card/Panel Padding */
+  --panel-padding-compact: 12px;
+  --panel-padding-normal: 16px;
+  --panel-padding-spacious: 24px;
+
+  /* List Item Padding */
+  --list-item-padding-v: 8px;
+  --list-item-padding-h: 12px;
+  --list-item-padding: 8px 12px;
+
+  /* Input Padding */
+  --input-padding: 8px 12px;
+
+  /* Icon Spacing */
+  --icon-text-gap-sm: 8px;
+  --icon-text-gap-md: 12px;
+  --icon-margin: 4px;
+
+  /* Grid Gaps */
+  --gap-tight: 4px;
+  --gap-normal: 8px;
+  --gap-relaxed: 12px;
+  --gap-loose: 16px;
+
+  /* ============================================
+     TRANSITIONS & ANIMATIONS
+     ============================================ */
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ============================================
+     Z-INDEX LAYERS
+     ============================================ */
+
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Text Styles */
+.text-display {
+  font-size: var(--font-size-32);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  line-height: var(--line-height-tight);
+}
+
+.text-h1 {
+  font-size: var(--font-size-16);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  line-height: var(--line-height-normal);
+}
+
+.text-h2 {
+  font-size: var(--font-size-14);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  line-height: var(--line-height-normal);
+}
+
+.text-body {
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  line-height: var(--line-height-normal);
+}
+
+.text-body-small {
+  font-size: var(--font-size-12);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  line-height: var(--line-height-normal);
+}
+
+.text-label {
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.text-caption {
+  font-size: var(--font-size-11);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
+  line-height: var(--line-height-tight);
+}
+
+.text-button {
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.text-price-positive {
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
+  color: var(--green-bullish);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-price-negative {
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
+  color: var(--red-bearish);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-monospace {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-13);
+  font-weight: var(--font-weight-regular);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}

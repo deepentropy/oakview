@@ -1,279 +1,454 @@
-# OakView CSV Example
+# OakView CSV Example - Enhanced
 
-This example demonstrates how to integrate OakView with CSV data files in your project.
+A comprehensive example demonstrating how to use OakView with CSV data files, featuring advanced capabilities like symbol search, interval detection, and data resampling.
 
 ## Features
 
-- Load historical OHLCV data from CSV files
-- Simple static data visualization
-- Perfect for demos, backtesting, and prototyping
-- No server or API required
+✅ **Header-less Interface** - Clean, minimal UI without top navigation
+✅ **Symbol Search** - Search symbols from available CSV files
+✅ **Automatic Interval Detection** - Detects available timeframes for each symbol
+✅ **Smart Data Resampling** - Automatically resamples to higher timeframes
+✅ **File Caching** - Caches loaded CSV files for better performance
+✅ **Info Panel** - Shows data details and available intervals (press 'I' to toggle)
 
-## Prerequisites
-
-- Node.js and npm installed
-- Basic knowledge of HTML and JavaScript
-
-## Project Structure
-
-```
-csv-example/
-├── index.html          # Main HTML file
-├── data/
-│   └── AAPL_1D.csv    # Sample CSV data file
-├── package.json        # Project dependencies
-└── README.md          # This file
-```
-
-## Installation
-
-1. Install dependencies:
+## Quick Start
 
 ```bash
+cd examples/csv-example
 npm install
-```
-
-2. Start the development server:
-
-```bash
 npm run dev
 ```
 
-3. Open your browser to the URL shown (typically http://localhost:5173)
+Then open http://localhost:5173 in your browser.
 
-## CSV Data Format
+## File Structure
 
-Your CSV files should follow this format:
+```
+csv-example/
+├── index.html              # Demo page (no header)
+├── providers/
+│   └── csv-provider.js     # Enhanced CSV data provider
+├── data/
+│   └── SPX_1D.csv         # Sample S&P 500 daily data
+├── package.json
+└── README.md
+```
+
+## Adding CSV Files
+
+### File Naming Convention
+
+Files must follow this pattern: `{SYMBOL}_{INTERVAL}.csv`
+
+**Examples:**
+- `SPX_1D.csv` - S&P 500 daily data
+- `AAPL_1H.csv` - Apple hourly data
+- `GOOGL_15.csv` - Google 15-minute data
+
+### Supported Intervals
+
+| Interval | Description | Minutes |
+|----------|-------------|---------|
+| `1` | 1 minute | 1 |
+| `5` | 5 minutes | 5 |
+| `15` | 15 minutes | 15 |
+| `30` | 30 minutes | 30 |
+| `1H` | 1 hour | 60 |
+| `4H` | 4 hours | 240 |
+| `1D` | 1 day | 1440 |
+| `1W` | 1 week | 10080 |
+| `1M` | 1 month | ~43800 |
+
+### CSV Format
+
+All CSV files must have a header row:
 
 ```csv
 time,open,high,low,close,volume
-2024-01-01,150.00,152.50,149.50,151.00,1000000
-2024-01-02,151.00,153.00,150.50,152.50,1200000
-2024-01-03,152.50,154.00,151.00,153.50,1100000
+2024-01-01,100.5,101.2,99.8,100.0,1000000
+2024-01-02,100.0,102.5,99.5,101.8,1200000
 ```
 
-### Supported Column Names
+**Required columns:**
+- `time` (or `date`, `timestamp`, `datetime`)
+- `open` (or `o`)
+- `high` (or `h`)
+- `low` (or `l`)
+- `close` (or `c`)
 
-The CSV provider supports various column name variations:
+**Optional columns:**
+- `volume` (or `vol`, `v`)
 
-- **Time**: `time`, `date`, `timestamp`, `datetime`
-- **Open**: `open`, `o`
-- **High**: `high`, `h`
-- **Low**: `low`, `l`
-- **Close**: `close`, `c`
-- **Volume**: `volume`, `vol`, `v` (optional)
+### Step-by-Step: Adding a New CSV File
 
-### File Naming Conventions
-
-The provider supports flexible file naming:
-
-1. **Fixed filename**: `data.csv` (specify in config)
-2. **Symbol-based**: `{SYMBOL}.csv` (e.g., `AAPL.csv`)
-3. **Symbol + Interval**: `{SYMBOL}_{INTERVAL}.csv` (e.g., `AAPL_1D.csv`)
-
-## Integration Guide
-
-### Step 1: Import OakView and CSV Provider
+1. **Create your CSV file** following the format above
+2. **Name it correctly**: `{SYMBOL}_{INTERVAL}.csv`
+3. **Place it in the `data/` folder**
+4. **Register it in `index.html`**:
 
 ```javascript
-import '../../src/oakview-chart-layout.js';
-import CSVDataProvider from './providers/csv-provider.js';
+const AVAILABLE_CSV_FILES = [
+  'SPX_1D.csv',
+  'AAPL_1H.csv',    // ← Add your file here
+  'GOOGL_1D.csv',   // ← Add your file here
+];
 ```
 
-Note: The CSV provider in this example is a reference implementation. You can copy it to your own project and customize it as needed.
+That's it! The provider will automatically detect the symbol and interval.
 
-### Step 2: Create the Provider Instance
+## Features Explained
+
+### 1. Symbol Search
+
+The provider can search through available CSV files:
 
 ```javascript
-const provider = new CSVDataProvider({
-  baseUrl: './data/',
-  // Optional: specify a fixed filename
-  // filename: 'my-data.csv'
-  // Optional: custom file pattern
-  // filePattern: (symbol, interval) => `${symbol}_${interval}.csv`
-});
+// Search all symbols
+const allSymbols = await provider.searchSymbols('');
+
+// Search for specific symbol
+const results = await provider.searchSymbols('AAPL');
 ```
 
-### Step 3: Add the Chart Component
-
-```html
-<oakview-chart-layout
-  id="chart"
-  symbol="AAPL"
-  interval="1D"
-  theme="dark">
-</oakview-chart-layout>
-```
-
-### Step 4: Connect the Provider
-
+**Returns:**
 ```javascript
-const chart = document.getElementById('chart');
-chart.setDataProvider(provider);
-```
-
-## Configuration Options
-
-### CSVDataProvider Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `baseUrl` | string | `''` | Base URL or path for CSV files |
-| `filename` | string | `undefined` | Static filename (overrides pattern) |
-| `filePattern` | function | `(symbol, interval) => ...` | Custom naming function |
-
-## Time Format Support
-
-The CSV provider accepts various time formats:
-
-- **ISO 8601**: `2024-01-01T00:00:00Z`
-- **Date only**: `2024-01-01`
-- **Unix timestamp**: `1704067200` (seconds)
-- **Date with time**: `2024-01-01 00:00:00`
-
-## Error Handling
-
-```javascript
-try {
-  await provider.initialize();
-  const data = await provider.fetchHistorical('AAPL', '1D');
-  console.log('Loaded', data.length, 'bars');
-} catch (error) {
-  console.error('Failed to load data:', error);
-  // Handle error (show message to user, etc.)
-}
-```
-
-## Advanced Usage
-
-### Custom File Pattern
-
-```javascript
-const provider = new CSVDataProvider({
-  baseUrl: './data/',
-  filePattern: (symbol, interval) => {
-    // Custom logic for file naming
-    const exchange = 'NYSE';
-    return `${exchange}_${symbol}_${interval}.csv`;
+[
+  {
+    symbol: 'AAPL',
+    description: 'AAPL (1H, 1D)',
+    intervals: ['1H', '1D'],
+    primaryExchange: 'CSV',
+    secType: 'historical'
   }
+]
+```
+
+**To test in browser:** Press 'T' to run symbol search test
+
+### 2. Interval Detection
+
+The provider automatically detects which intervals are available for each symbol:
+
+```javascript
+// Get available intervals for a symbol
+const intervals = provider.getAvailableIntervals('SPX');
+// Returns: ['1D']
+
+// Check if specific interval exists
+const hasData = provider.hasData('AAPL', '1H');
+// Returns: true or false
+
+// Get base (smallest) interval
+const baseInterval = provider.getBaseInterval('AAPL');
+// Returns: '1H' (if that's the smallest available)
+```
+
+**UI Indication:**
+- Available intervals shown with normal style
+- Unavailable intervals shown grayed out and crossed
+- Base interval marked with ⭐
+
+### 3. Data Resampling
+
+If you request a higher timeframe than available, the provider automatically resamples:
+
+**Example:**
+- You have `AAPL_1H.csv` (hourly data)
+- You request `1D` (daily) interval
+- Provider automatically resamples hourly → daily
+
+**Resampling Algorithm:**
+```javascript
+// For each target bar:
+- open: first bar's open
+- high: maximum of all bar highs
+- low: minimum of all bar lows
+- close: last bar's close
+- volume: sum of all bar volumes
+```
+
+**Limitations:**
+- Can only resample to HIGHER timeframes (e.g., 1H → 1D ✅)
+- Cannot resample to LOWER timeframes (e.g., 1D → 1H ❌)
+
+**Console Output:**
+```
+Resampling AAPL from 1H to 1D
+Resampled 168 bars to 7 bars
+```
+
+### 4. File Caching
+
+Loaded CSV files are cached in memory to avoid redundant fetches:
+
+```javascript
+// First load: fetches from server
+await provider.fetchHistorical('SPX', '1D');
+
+// Second load: uses cache
+await provider.fetchHistorical('SPX', '1D');
+// Console: "Using cached data for: SPX_1D"
+```
+
+Cache is cleared on disconnect:
+```javascript
+provider.disconnect(); // Clears all cached data
+```
+
+### 5. Info Panel
+
+Press **'I'** to toggle the info panel which shows:
+
+- **Symbol**: Current symbol
+- **Base Interval**: Smallest available interval for this symbol
+- **Current Interval**: Currently displayed interval
+- **Bars Loaded**: Number of bars/candles
+- **Resampled**: Whether data was resampled
+- **Available Intervals**: Visual indicator of all intervals (⭐ = base)
+
+## API Reference
+
+### CSVDataProvider
+
+#### Constructor
+
+```javascript
+const provider = new CSVDataProvider({
+  baseUrl: './data/',                    // Base path for CSV files
+  availableFiles: ['SPX_1D.csv', ...]   // List of available files
 });
 ```
 
-### Time Range Filtering
+#### Methods
+
+##### initialize(config)
+Initialize the provider and build file inventory.
 
 ```javascript
-// Fetch data for specific time range
-const fromDate = new Date('2024-01-01').getTime() / 1000;
-const toDate = new Date('2024-12-31').getTime() / 1000;
-
-const data = await provider.fetchHistorical('AAPL', '1D', fromDate, toDate);
+await provider.initialize();
 ```
 
-### Multiple Symbols
+##### setAvailableFiles(files)
+Update the list of available CSV files.
 
 ```javascript
-// Switch between different symbols dynamically
-const symbols = ['AAPL', 'GOOGL', 'MSFT'];
+provider.setAvailableFiles(['SPX_1D.csv', 'AAPL_1H.csv']);
+```
 
-for (const symbol of symbols) {
+##### searchSymbols(query)
+Search for symbols from available files.
+
+```javascript
+const results = await provider.searchSymbols('AAPL');
+```
+
+##### getAvailableIntervals(symbol)
+Get available intervals for a symbol.
+
+```javascript
+const intervals = provider.getAvailableIntervals('SPX');
+// Returns: ['1D']
+```
+
+##### hasData(symbol, interval)
+Check if symbol/interval combination exists.
+
+```javascript
+const exists = provider.hasData('AAPL', '1H');
+// Returns: true/false
+```
+
+##### getBaseInterval(symbol)
+Get the smallest available interval for a symbol.
+
+```javascript
+const base = provider.getBaseInterval('AAPL');
+// Returns: '1H'
+```
+
+##### fetchHistorical(symbol, interval, from, to)
+Fetch historical data with auto-resampling.
+
+```javascript
+const data = await provider.fetchHistorical('SPX', '1W');
+// Automatically resamples from 1D to 1W
+```
+
+##### disconnect()
+Clear cache and cleanup.
+
+```javascript
+provider.disconnect();
+```
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| **I** | Toggle info panel |
+| **T** | Test symbol search (console) |
+
+## Example: Complete Integration
+
+```javascript
+import CSVDataProvider from './providers/csv-provider.js';
+
+// 1. Create provider
+const provider = new CSVDataProvider({
+  baseUrl: './data/',
+  availableFiles: [
+    'SPX_1D.csv',
+    'AAPL_1H.csv',
+    'GOOGL_1D.csv'
+  ]
+});
+
+// 2. Initialize
+await provider.initialize();
+
+// 3. Search symbols
+const symbols = await provider.searchSymbols('');
+console.log('Available symbols:', symbols);
+
+// 4. Check available intervals
+const spxIntervals = provider.getAvailableIntervals('SPX');
+console.log('SPX intervals:', spxIntervals); // ['1D']
+
+// 5. Load data (with auto-resampling)
+const weeklyData = await provider.fetchHistorical('SPX', '1W');
+// Automatically resamples 1D → 1W
+
+// 6. Set provider on chart
+chart.setDataProvider(provider);
+
+// 7. Listen for symbol changes
+chart.addEventListener('symbol-change', async (e) => {
+  const { symbol } = e.detail;
   const data = await provider.fetchHistorical(symbol, '1D');
-  console.log(`${symbol}: ${data.length} bars`);
-}
+  chart.setData(data);
+});
 ```
 
-## Limitations
+## Common Use Cases
 
-- **Static Data Only**: CSV provider does not support real-time updates
-- **Client-Side Loading**: All data is loaded in the browser (consider file size)
-- **No Server Required**: Works with any static file server or local file system
-
-## Generating CSV Data
-
-You can generate CSV data from various sources:
-
-### From Python (pandas)
-
-```python
-import pandas as pd
-
-# Create sample data
-df = pd.DataFrame({
-    'time': pd.date_range('2024-01-01', periods=100, freq='D'),
-    'open': [100 + i * 0.5 for i in range(100)],
-    'high': [102 + i * 0.5 for i in range(100)],
-    'low': [98 + i * 0.5 for i in range(100)],
-    'close': [101 + i * 0.5 for i in range(100)],
-    'volume': [1000000 + i * 10000 for i in range(100)]
-})
-
-# Save to CSV
-df.to_csv('AAPL_1D.csv', index=False)
-```
-
-### From JavaScript
+### Use Case 1: Display Only Available Intervals
 
 ```javascript
-const data = [];
-const startDate = new Date('2024-01-01');
+function updateIntervalSelector(symbol) {
+  const available = provider.getAvailableIntervals(symbol);
+  const baseInterval = provider.getBaseInterval(symbol);
 
-for (let i = 0; i < 100; i++) {
-  const date = new Date(startDate);
-  date.setDate(date.getDate() + i);
+  // Show which intervals can be displayed
+  const canDisplay = [...available];
 
-  data.push({
-    time: date.toISOString().split('T')[0],
-    open: 100 + i * 0.5,
-    high: 102 + i * 0.5,
-    low: 98 + i * 0.5,
-    close: 101 + i * 0.5,
-    volume: 1000000 + i * 10000
-  });
+  // Add higher timeframes (resampling possible)
+  if (baseInterval === '1H') {
+    canDisplay.push('4H', '1D', '1W');
+  } else if (baseInterval === '1D') {
+    canDisplay.push('1W', '1M');
+  }
+
+  // Update UI to show only these intervals
+  updateUIIntervals(canDisplay);
 }
+```
 
-// Convert to CSV
-const csv = [
-  'time,open,high,low,close,volume',
-  ...data.map(d => `${d.time},${d.open},${d.high},${d.low},${d.close},${d.volume}`)
-].join('\n');
+### Use Case 2: Prevent Invalid Requests
 
-console.log(csv);
+```javascript
+async function loadData(symbol, interval) {
+  const baseInterval = provider.getBaseInterval(symbol);
+
+  if (!baseInterval) {
+    alert(`No data available for ${symbol}`);
+    return;
+  }
+
+  // Check if we can resample to this interval
+  const baseMinutes = parseIntervalToMinutes(baseInterval);
+  const requestMinutes = parseIntervalToMinutes(interval);
+
+  if (requestMinutes < baseMinutes) {
+    alert(`Cannot display ${interval} - only ${baseInterval} and higher available`);
+    return;
+  }
+
+  // Proceed with load
+  const data = await provider.fetchHistorical(symbol, interval);
+  chart.setData(data);
+}
+```
+
+### Use Case 3: Show Resampling Status
+
+```javascript
+async function loadWithStatus(symbol, interval) {
+  const isResampled = !provider.hasData(symbol, interval);
+  const baseInterval = provider.getBaseInterval(symbol);
+
+  if (isResampled) {
+    showNotification(`Resampling from ${baseInterval} to ${interval}`);
+  }
+
+  const data = await provider.fetchHistorical(symbol, interval);
+  chart.setData(data);
+
+  if (isResampled) {
+    showNotification(`Displayed ${data.length} resampled bars`);
+  }
+}
 ```
 
 ## Troubleshooting
 
-### File Not Found
+### Issue: "No data available for symbol"
 
-**Error**: `Failed to load CSV: Not Found`
+**Cause:** Symbol not in available files list
 
-**Solution**: Check that:
-- The file path is correct relative to your HTML file
-- The file naming matches the pattern (symbol + interval)
-- The web server can access the data directory
+**Solution:**
+1. Check file exists in `data/` folder
+2. Verify filename format: `{SYMBOL}_{INTERVAL}.csv`
+3. Add to `AVAILABLE_CSV_FILES` array in `index.html`
 
-### Invalid CSV Format
+### Issue: Resampling produces wrong data
 
-**Error**: `CSV must have a time/date column`
+**Cause:** Incorrect interval format or parsing
 
-**Solution**: Ensure your CSV has:
-- A header row with column names
-- A time/date column (any supported name)
-- OHLC columns (open, high, low, close)
+**Solution:**
+- Use standard interval formats: `1`, `5`, `15`, `30`, `1H`, `4H`, `1D`, `1W`, `1M`
+- Check console for resampling logs
+- Verify base interval is correct
 
-### Data Not Displaying
+### Issue: Chart shows no data
 
-**Solution**: Check browser console for errors and verify:
-- CSV data is valid (no NaN values)
-- Time values are properly formatted
-- Data is sorted by time (ascending)
+**Cause:** CSV parsing error or invalid format
 
-## Next Steps
+**Solution:**
+1. Check browser console for errors
+2. Verify CSV has header row
+3. Ensure required columns exist (time, open, high, low, close)
+4. Check time format is valid
 
-- Explore the [WebSocket Example](../websocket-example/) for real-time data
-- Check the [API Documentation](../../docs/) for advanced features
-- Customize the chart appearance and layout
+## Performance Tips
 
-## Support
+1. **Use appropriate base intervals**: Smaller intervals = more data = slower
+2. **Leverage caching**: Don't call `disconnect()` unless necessary
+3. **Limit file count**: Too many files = slower initialization
+4. **Use resampling**: Better than storing multiple files for same symbol
 
-For issues or questions:
-- GitHub Issues: [OakView Issues](https://github.com/yourrepo/oakview/issues)
-- Documentation: [OakView Docs](../../docs/)
+## What's Next?
+
+- Add more CSV files to explore different symbols
+- Integrate with the symbol search UI in OakView
+- Build a file upload feature for custom CSV files
+- Create a manifest.json for automatic file discovery
+- Add data export functionality
+
+## Related Examples
+
+- [WebSocket Example](../websocket-example/) - Real-time data streaming
+- [VoltTrading Integration](../websocket-example/) - Live market data
+
+## License
+
+MIT License - See [LICENSE](../../LICENSE) for details

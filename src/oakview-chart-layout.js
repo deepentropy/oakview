@@ -1,5 +1,6 @@
 import { createChart } from 'lightweight-charts';
 import './oakview-chart-ui.js';    // Chart with toolbar
+import cssVariables from './oakview-variables.css?inline';
 
 /**
  * OakView Chart Layout Component
@@ -121,11 +122,13 @@ class OakViewChartLayout extends HTMLElement {
   render() {
     const style = document.createElement('style');
     style.textContent = `
+      ${cssVariables}
+
       :host {
         display: block;
         width: 100%;
         height: 100%;
-        background: #131722;
+        background: var(--bg-primary);
         display: flex;
         flex-direction: column;
       }
@@ -148,9 +151,9 @@ class OakViewChartLayout extends HTMLElement {
       }
 
       .sidebar-left {
-        width: 52px;
-        background: #131722;
-        border-right: 4px solid #2E2E2E;
+        width: var(--toolbar-width);
+        background: var(--bg-primary);
+        border-right: 1px solid var(--border-primary);
         flex-shrink: 0;
       }
 
@@ -170,16 +173,16 @@ class OakViewChartLayout extends HTMLElement {
       }
 
       .bottom-bar {
-        height: 29px;
-        background: #131722;
-        border-top: 4px solid #2E2E2E;
+        height: var(--bottom-bar-height);
+        background: var(--bg-primary);
+        border-top: 1px solid var(--border-primary);
         flex-shrink: 0;
       }
 
       .sidebar-right {
-        width: 52px;
-        background: #131722;
-        border-left: 4px solid #2E2E2E;
+        width: var(--toolbar-width);
+        background: var(--bg-primary);
+        border-left: 1px solid var(--border-primary);
         flex-shrink: 0;
       }
 
@@ -220,20 +223,20 @@ class OakViewChartLayout extends HTMLElement {
       }
 
       .chart-pane {
-        background: #131722;
+        background: var(--bg-primary);
         position: relative;
         overflow: hidden;
         border: 2px solid transparent;
-        transition: border-color 0.2s;
+        transition: border-color var(--transition-normal);
         cursor: pointer;
       }
 
       .chart-pane:hover {
-        border-color: #1e2533;
+        border-color: var(--bg-secondary);
       }
 
       .chart-pane.selected {
-        border-color: #2962ff !important;
+        border-color: var(--blue-primary) !important;
       }
 
       /* Pane charts fill their containers */
@@ -246,8 +249,8 @@ class OakViewChartLayout extends HTMLElement {
       /* Style for control chart - only show toolbar, hide chart area */
       .control-chart {
         min-height: 0 !important;
-        height: 42px !important; /* 38px toolbar + 4px border */
-        max-height: 42px !important;
+        height: calc(var(--navbar-height) + 1px) !important; /* navbar height + border */
+        max-height: calc(var(--navbar-height) + 1px) !important;
         overflow: hidden !important;
       }
     `;
@@ -469,6 +472,14 @@ class OakViewChartLayout extends HTMLElement {
    */
   getAllCharts() {
     return this._panes.map(pane => pane.chart);
+  }
+
+  /**
+   * Get the number of chart panes
+   * @returns {number} Number of chart panes
+   */
+  getChartCount() {
+    return this._panes.length;
   }
 
   /**

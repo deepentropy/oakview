@@ -1,4 +1,5 @@
 import { createChart } from 'lightweight-charts';
+import cssVariables from './oakview-variables.css?inline';
 
 // CSV Loader utility
 async function loadCSV(url) {
@@ -72,6 +73,7 @@ class OakViewChart extends HTMLElement {
     requestAnimationFrame(() => {
       this.initChart();
       this.setupEventListeners();
+      this.loadIndicators();
 
       // Load data if data-source is provided
       const dataSource = this.getAttribute('data-source');
@@ -108,6 +110,11 @@ class OakViewChart extends HTMLElement {
    */
   setDataProvider(provider) {
     this._dataProvider = provider;
+    // Update available intervals for current symbol
+    const symbol = this.getAttribute('symbol');
+    if (symbol) {
+      this.updateAvailableIntervals(symbol);
+    }
   }
 
   /**
@@ -154,6 +161,208 @@ class OakViewChart extends HTMLElement {
     return this._chart;
   }
 
+  /**
+   * Load available indicators from the oakscript-engine examples folder
+   */
+  async loadIndicators() {
+    try {
+      // Hardcode indicators for now - TODO: load from external manifest
+      // Use relative paths from Vite root (examples/csv-example)
+      // Go up to oakview root, then to parent, then to oakscript-engine
+      const basePath = '../../oakscript-engine/examples/indicators';
+      const indicators = [
+        {
+          "id": "average-day-range",
+          "title": "Average Day Range",
+          "overlay": false,
+          "precision": 2,
+          "calculationModule": `${basePath}/average-day-range-calculation.js`,
+          "indicatorModule": `${basePath}/average-day-range.js`
+        },
+        {
+          "id": "balance-of-power",
+          "title": "Balance of Power",
+          "overlay": false,
+          "precision": 2,
+          "calculationModule": `${basePath}/balance-of-power-calculation.js`,
+          "indicatorModule": `${basePath}/balance-of-power.js`
+        },
+        {
+          "id": "moving-average-ribbon",
+          "title": "Moving Average Ribbon",
+          "overlay": true,
+          "precision": 2,
+          "calculationModule": `${basePath}/moving-average-ribbon-calculation.js`,
+          "indicatorModule": `${basePath}/moving-average-ribbon.js`
+        },
+        {
+          "id": "momentum",
+          "title": "Momentum",
+          "overlay": false,
+          "precision": 2,
+          "calculationModule": `${basePath}/momentum-calculation.js`,
+          "indicatorModule": `${basePath}/momentum.js`
+        }
+      ];
+
+      this.renderIndicators(indicators);
+      console.log(`Loaded ${indicators.length} indicators`);
+    } catch (error) {
+      console.error('Failed to load indicators:', error);
+    }
+  }
+
+  /**
+   * Render indicators in the modal
+   */
+  renderIndicators(indicators) {
+    const container = this.shadowRoot.querySelector('.indicator-list-container');
+    if (!container) return;
+
+    container.innerHTML = indicators.map(indicator => `
+      <div class="indicator-list-item" data-indicator-id="${indicator.id}" data-indicator-module="${indicator.indicatorModule}" data-indicator-calc="${indicator.calculationModule}">
+        <span class="indicator-favorite">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="currentColor">
+            <path fill-rule="evenodd" d="m12.13 5.74 3.37.9-2.44 2.06L13.9 13 9 10.38 4.1 13l.94-4.3-2.44-2.06 3.37-.9L9 2l3.13 3.74Zm1.99 2-1.68 1.42.4 2.96L9 10.66l-3.84 1.46.4-2.96-1.68-1.42 3-.6L9 4.56l2.12 2.56 3 .61Z"></path>
+          </svg>
+        </span>
+        <div class="indicator-list-item-main">
+          <div class="indicator-list-item-title">${indicator.title}</div>
+        </div>
+        <div class="indicator-actions">
+          <span class="indicator-action-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
+              <path fill="currentColor" d="M.5 9l-.22-.45a.5.5 0 0 0 0 .9L.5 9zm17 0l.22.45a.5.5 0 0 0 0-.9L17.5 9zm-15.66.67l-.22.45.22-.45zM7 2H5.5v1H7V2zM3 4.5v1.15h1V4.5H3zM1.62 7.88l-1.34.67.44.9 1.35-.67-.45-.9zM.28 9.45l1.34.67.45-.9-1.35-.67-.44.9zM3 12.35v1.15h1v-1.15H3zM5.5 16H7v-1H5.5v1zM11 3h1.5V2H11v1zm3 1.5v1.15h1V4.5h-1zm1.93 4.28l1.35.67.44-.9-1.34-.67-.45.9zm1.35-.23l-1.35.67.45.9 1.34-.67-.44-.9zM14 12.35v1.15h1v-1.15h-1zM12.5 15H11v1h1.5v-1zm3.43-5.78A3.5 3.5 0 0 0 14 12.35h1c0-.94.54-1.8 1.38-2.23l-.45-.9zM14 5.65a3.5 3.5 0 0 0 1.93 3.13l.45-.9A2.5 2.5 0 0 1 15 5.65h-1zM12.5 3c.83 0 1.5.67 1.5 1.5h1A2.5 2.5 0 0 0 12.5 2v1zM3 13.5A2.5 2.5 0 0 0 5.5 16v-1A1.5 1.5 0 0 1 4 13.5H3zm-1.38-3.38A2.5 2.5 0 0 1 3 12.35h1a3.5 3.5 0 0 0-1.93-3.13l-.45.9zM3 5.65a2.5 2.5 0 0 1-1.38 2.23l.45.9A3.5 3.5 0 0 0 4 5.65H3zm11 7.85c0 .83-.67 1.5-1.5 1.5v1a2.5 2.5 0 0 0 2.5-2.5h-1zM5.5 2A2.5 2.5 0 0 0 3 4.5h1C4 3.67 4.67 3 5.5 3V2z"></path>
+            </svg>
+          </span>
+        </div>
+      </div>
+    `).join('');
+
+    // Add click event listeners to indicator items
+    container.querySelectorAll('.indicator-list-item').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        // Don't trigger if clicking favorite star
+        if (e.target.closest('.indicator-favorite')) {
+          return;
+        }
+
+        const indicatorId = item.dataset.indicatorId;
+        const indicatorModule = item.dataset.indicatorModule;
+        const calcModule = item.dataset.indicatorCalc;
+
+        console.log(`Loading indicator: ${indicatorId}`);
+
+        try {
+          await this.loadIndicatorOnChart(indicatorId, indicatorModule, calcModule);
+
+          // Close the modal
+          const modal = this.shadowRoot.querySelector('.indicator-modal');
+          if (modal) {
+            modal.classList.remove('show');
+          }
+        } catch (error) {
+          console.error(`Failed to load indicator ${indicatorId}:`, error);
+          alert(`Failed to load indicator: ${error.message}`);
+        }
+      });
+    });
+  }
+
+  /**
+   * Load and display an indicator on the chart
+   */
+  async loadIndicatorOnChart(indicatorId, indicatorModulePath, calcModulePath) {
+    console.log(`Loading indicator modules for ${indicatorId}`);
+    console.log(`Indicator module: ${indicatorModulePath}`);
+
+    // If this is the control chart (toolbar chart), get the pane chart from parent layout
+    let targetChart = this;
+    const isControlChart = this.classList.contains('control-chart');
+
+    if (isControlChart) {
+      console.log('This is control chart, getting pane chart from parent layout');
+      const layout = this.getRootNode().host; // Get the layout element
+      if (layout && layout.getChartAt) {
+        targetChart = layout.getChartAt(0); // Get first pane chart
+        console.log('Target chart:', targetChart);
+      }
+    }
+
+    if (!targetChart || !targetChart._chart) {
+      console.error('No target chart available');
+      return;
+    }
+
+    // Get data from target chart
+    const chartData = targetChart._data || targetChart._allData;
+    console.log('Chart data available:', chartData?.length || 0, 'bars');
+    console.log('_data:', targetChart._data?.length, '_allData:', targetChart._allData?.length);
+
+    if (!chartData || chartData.length === 0) {
+      console.error('No data available for indicator calculation');
+      return;
+    }
+
+    try {
+      // Dynamically import the indicator module
+      const module = await import(/* @vite-ignore */ indicatorModulePath);
+      console.log('Indicator module loaded:', module);
+
+      // Get the create function - try different naming conventions
+      const createFnName = this.getIndicatorCreateFunctionName(indicatorId);
+      const createFn = module[createFnName] || module.default;
+
+      if (!createFn) {
+        throw new Error(`Could not find create function ${createFnName} in module`);
+      }
+
+      // Get the main series from target chart
+      const mainSeries = targetChart._currentSeries || targetChart._series;
+      console.log('Main series:', mainSeries);
+
+      if (!mainSeries) {
+        throw new Error('No main series available');
+      }
+
+      // Create the indicator instance
+      console.log(`Creating indicator with ${chartData.length} bars`);
+      const indicator = createFn(targetChart._chart, mainSeries, {}, chartData);
+      console.log('Indicator created:', indicator);
+
+      // Attach the indicator to the chart
+      indicator.attach();
+      console.log(`✓ Indicator ${indicatorId} attached successfully`);
+
+      // Store indicator reference for later removal
+      if (!targetChart._indicators) {
+        targetChart._indicators = [];
+      }
+      targetChart._indicators.push({
+        id: indicatorId,
+        instance: indicator
+      });
+
+    } catch (error) {
+      console.error(`Failed to load indicator ${indicatorId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the expected create function name for an indicator
+   * Converts "average-day-range" to "createAverageDayRangeIndicator"
+   */
+  getIndicatorCreateFunctionName(indicatorId) {
+    // Convert kebab-case to PascalCase
+    const pascalCase = indicatorId
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+
+    return `create${pascalCase}Indicator`;
+  }
+
   disconnectedCallback() {
     // Cleanup subscription if exists
     if (this._subscriptionUnsubscribe) {
@@ -191,14 +400,16 @@ class OakViewChart extends HTMLElement {
 
     const style = document.createElement('style');
     style.textContent = `
+      ${cssVariables}
+
       :host {
         display: flex;
         flex-direction: column;
         width: 100%;
         height: 100%;
         min-height: 400px;
-        background: #131722;
-        font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
+        background: var(--bg-primary);
+        font-family: var(--font-primary);
         position: relative;
       }
 
@@ -212,15 +423,15 @@ class OakViewChart extends HTMLElement {
 
       .toolbar {
         display: ${showToolbar ? 'flex' : 'none'};
-        height: 38px;
-        background: #131722;
-        border-bottom: 1px solid #2a2e39;
+        height: var(--navbar-height);
+        background: var(--bg-primary);
+        border-bottom: 1px solid var(--border-primary);
         align-items: center;
-        padding: 0 8px;
-        gap: 8px;
+        padding: 0 var(--space-4);
+        gap: var(--gap-normal);
         flex-shrink: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif;
-        font-size: 14px;
+        font-family: var(--font-primary);
+        font-size: var(--font-size-14);
         font-feature-settings: "lnum", "tnum";
       }
 
@@ -231,11 +442,14 @@ class OakViewChart extends HTMLElement {
       }
 
       .sidebar-left {
-        display: ${hideSidebar ? 'none' : 'block'};
-        width: 52px;
-        background: #131722;
-        border-right: 4px solid #2E2E2E;
+        display: ${hideSidebar ? 'none' : 'flex'};
+        flex-direction: column;
+        width: var(--toolbar-width);
+        background: var(--bg-primary);
+        border-right: 1px solid var(--border-primary);
         flex-shrink: 0;
+        align-items: center;
+        padding: var(--space-2) 0;
       }
 
       .chart-area {
@@ -247,18 +461,20 @@ class OakViewChart extends HTMLElement {
       }
 
       .sidebar-right {
-        display: ${hideSidebar ? 'none' : 'block'};
-        width: 52px;
-        background: #131722;
-        border-left: 4px solid #2E2E2E;
+        display: ${hideSidebar ? 'none' : 'flex'};
+        flex-direction: column;
+        width: var(--panel-width);
+        background: var(--bg-primary);
+        border-left: 1px solid var(--border-primary);
         flex-shrink: 0;
+        overflow-y: auto;
       }
 
       .bottom-bar {
         display: ${hideSidebar ? 'none' : 'block'};
-        height: 24px;
-        background: #131722;
-        border-top: 4px solid #2E2E2E;
+        height: var(--bottom-bar-height);
+        background: var(--bg-primary);
+        border-top: 1px solid var(--border-primary);
         flex-shrink: 0;
       }
 
@@ -267,7 +483,7 @@ class OakViewChart extends HTMLElement {
         position: relative;
         overflow: hidden;
         min-height: 0;
-        background: #1E222D; /* Debug: ensure this CSS is loaded */
+        background: var(--bg-primary);
       }
 
       .toolbar-group {
@@ -1088,6 +1304,47 @@ class OakViewChart extends HTMLElement {
         margin: 0;
       }
 
+      /* Left Toolbar Buttons */
+      .toolbar-tool-button {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        color: var(--text-primary);
+        transition: background var(--transition-fast);
+        position: relative;
+      }
+
+      .toolbar-tool-button:hover {
+        background: var(--hover-bg-dark);
+      }
+
+      .toolbar-tool-button.active {
+        background: var(--bg-secondary);
+        border-left: 2px solid var(--blue-primary);
+      }
+
+      .toolbar-tool-button svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .toolbar-separator {
+        width: 32px;
+        height: 1px;
+        background: var(--border-primary);
+        margin: var(--space-2) 0;
+      }
+
+      .toolbar-trash {
+        margin-top: auto;
+      }
+
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
@@ -1343,6 +1600,14 @@ class OakViewChart extends HTMLElement {
                 </div>
                 <div class="dropdown-item" data-interval="240">
                   <span class="dropdown-item-label">4 hours</span>
+                  <span class="dropdown-item-favorite">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
+                      <path stroke="currentColor" d="M9 2.13l1.903 3.855.116.236.26.038 4.255.618-3.079 3.001-.188.184.044.259.727 4.237-3.805-2L9 12.434l-.233.122-3.805 2.001.727-4.237.044-.26-.188-.183-3.079-3.001 4.255-.618.26-.038.116-.236L9 2.13z"></path>
+                    </svg>
+                  </span>
+                </div>
+                <div class="dropdown-item" data-interval="720">
+                  <span class="dropdown-item-label">12 hours</span>
                   <span class="dropdown-item-favorite">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
                       <path stroke="currentColor" d="M9 2.13l1.903 3.855.116.236.26.038 4.255.618-3.079 3.001-.188.184.044.259.727 4.237-3.805-2L9 12.434l-.233.122-3.805 2.001.727-4.237.044-.26-.188-.183-3.079-3.001 4.255-.618.26-.038.116-.236L9 2.13z"></path>
@@ -1716,57 +1981,9 @@ class OakViewChart extends HTMLElement {
             </div>
 
             <div class="indicator-main">
-              <div class="indicator-list-header">Script name</div>
-              <div class="indicator-list-item" data-indicator="ma">
-                <span class="indicator-favorite checked">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
-                    <path fill="currentColor" d="M9 1l2.35 4.76 5.26.77-3.8 3.7.9 5.24L9 13l-4.7 2.47.9-5.23-3.8-3.71 5.25-.77L9 1z"></path>
-                  </svg>
-                </span>
-                <div class="indicator-list-item-main">
-                  <div class="indicator-list-item-title">Moving Average</div>
-                </div>
-                <div class="indicator-actions">
-                  <span class="indicator-action-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
-                      <path fill="currentColor" d="M.5 9l-.22-.45a.5.5 0 0 0 0 .9L.5 9zm17 0l.22.45a.5.5 0 0 0 0-.9L17.5 9zm-15.66.67l-.22.45.22-.45zM7 2H5.5v1H7V2zM3 4.5v1.15h1V4.5H3zM1.62 7.88l-1.34.67.44.9 1.35-.67-.45-.9zM.28 9.45l1.34.67.45-.9-1.35-.67-.44.9zM3 12.35v1.15h1v-1.15H3zM5.5 16H7v-1H5.5v1zM11 3h1.5V2H11v1zm3 1.5v1.15h1V4.5h-1zm1.93 4.28l1.35.67.44-.9-1.34-.67-.45.9zm1.35-.23l-1.35.67.45.9 1.34-.67-.44-.9zM14 12.35v1.15h1v-1.15h-1zM12.5 15H11v1h1.5v-1zm3.43-5.78A3.5 3.5 0 0 0 14 12.35h1c0-.94.54-1.8 1.38-2.23l-.45-.9zM14 5.65a3.5 3.5 0 0 0 1.93 3.13l.45-.9A2.5 2.5 0 0 1 15 5.65h-1zM12.5 3c.83 0 1.5.67 1.5 1.5h1A2.5 2.5 0 0 0 12.5 2v1zM3 13.5A2.5 2.5 0 0 0 5.5 16v-1A1.5 1.5 0 0 1 4 13.5H3zm-1.38-3.38A2.5 2.5 0 0 1 3 12.35h1a3.5 3.5 0 0 0-1.93-3.13l-.45.9zM3 5.65a2.5 2.5 0 0 1-1.38 2.23l.45.9A3.5 3.5 0 0 0 4 5.65H3zm11 7.85c0 .83-.67 1.5-1.5 1.5v1a2.5 2.5 0 0 0 2.5-2.5h-1zM5.5 2A2.5 2.5 0 0 0 3 4.5h1C4 3.67 4.67 3 5.5 3V2z"></path>
-                    </svg>
-                  </span>
-                </div>
-              </div>
-              <div class="indicator-list-item" data-indicator="ema">
-                <span class="indicator-favorite checked">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
-                    <path fill="currentColor" d="M9 1l2.35 4.76 5.26.77-3.8 3.7.9 5.24L9 13l-4.7 2.47.9-5.23-3.8-3.71 5.25-.77L9 1z"></path>
-                  </svg>
-                </span>
-                <div class="indicator-list-item-main">
-                  <div class="indicator-list-item-title">EMA - Exponential Moving Average</div>
-                </div>
-                <div class="indicator-actions">
-                  <span class="indicator-action-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
-                      <path fill="currentColor" d="M.5 9l-.22-.45a.5.5 0 0 0 0 .9L.5 9zm17 0l.22.45a.5.5 0 0 0 0-.9L17.5 9zm-15.66.67l-.22.45.22-.45zM7 2H5.5v1H7V2zM3 4.5v1.15h1V4.5H3zM1.62 7.88l-1.34.67.44.9 1.35-.67-.45-.9zM.28 9.45l1.34.67.45-.9-1.35-.67-.44.9zM3 12.35v1.15h1v-1.15H3zM5.5 16H7v-1H5.5v1zM11 3h1.5V2H11v1zm3 1.5v1.15h1V4.5h-1zm1.93 4.28l1.35.67.44-.9-1.34-.67-.45.9zm1.35-.23l-1.35.67.45.9 1.34-.67-.44-.9zM14 12.35v1.15h1v-1.15h-1zM12.5 15H11v1h1.5v-1zm3.43-5.78A3.5 3.5 0 0 0 14 12.35h1c0-.94.54-1.8 1.38-2.23l-.45-.9zM14 5.65a3.5 3.5 0 0 0 1.93 3.13l.45-.9A2.5 2.5 0 0 1 15 5.65h-1zM12.5 3c.83 0 1.5.67 1.5 1.5h1A2.5 2.5 0 0 0 12.5 2v1zM3 13.5A2.5 2.5 0 0 0 5.5 16v-1A1.5 1.5 0 0 1 4 13.5H3zm-1.38-3.38A2.5 2.5 0 0 1 3 12.35h1a3.5 3.5 0 0 0-1.93-3.13l-.45.9zM3 5.65a2.5 2.5 0 0 1-1.38 2.23l.45.9A3.5 3.5 0 0 0 4 5.65H3zm11 7.85c0 .83-.67 1.5-1.5 1.5v1a2.5 2.5 0 0 0 2.5-2.5h-1zM5.5 2A2.5 2.5 0 0 0 3 4.5h1C4 3.67 4.67 3 5.5 3V2z"></path>
-                    </svg>
-                  </span>
-                </div>
-              </div>
-              <div class="indicator-list-item" data-indicator="rsi">
-                <span class="indicator-favorite">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="currentColor">
-                    <path fill-rule="evenodd" d="m12.13 5.74 3.37.9-2.44 2.06L13.9 13 9 10.38 4.1 13l.94-4.3-2.44-2.06 3.37-.9L9 2l3.13 3.74Zm1.99 2-1.68 1.42.4 2.96L9 10.66l-3.84 1.46.4-2.96-1.68-1.42 3-.6L9 4.56l2.12 2.56 3 .61Z"></path>
-                  </svg>
-                </span>
-                <div class="indicator-list-item-main">
-                  <div class="indicator-list-item-title">RSI - Relative Strength Index</div>
-                </div>
-                <div class="indicator-actions">
-                  <span class="indicator-action-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18" fill="none">
-                      <path fill="currentColor" d="M.5 9l-.22-.45a.5.5 0 0 0 0 .9L.5 9zm17 0l.22.45a.5.5 0 0 0 0-.9L17.5 9zm-15.66.67l-.22.45.22-.45zM7 2H5.5v1H7V2zM3 4.5v1.15h1V4.5H3zM1.62 7.88l-1.34.67.44.9 1.35-.67-.45-.9zM.28 9.45l1.34.67.45-.9-1.35-.67-.44.9zM3 12.35v1.15h1v-1.15H3zM5.5 16H7v-1H5.5v1zM11 3h1.5V2H11v1zm3 1.5v1.15h1V4.5h-1zm1.93 4.28l1.35.67.44-.9-1.34-.67-.45.9zm1.35-.23l-1.35.67.45.9 1.34-.67-.44-.9zM14 12.35v1.15h1v-1.15h-1zM12.5 15H11v1h1.5v-1zm3.43-5.78A3.5 3.5 0 0 0 14 12.35h1c0-.94.54-1.8 1.38-2.23l-.45-.9zM14 5.65a3.5 3.5 0 0 0 1.93 3.13l.45-.9A2.5 2.5 0 0 1 15 5.65h-1zM12.5 3c.83 0 1.5.67 1.5 1.5h1A2.5 2.5 0 0 0 12.5 2v1zM3 13.5A2.5 2.5 0 0 0 5.5 16v-1A1.5 1.5 0 0 1 4 13.5H3zm-1.38-3.38A2.5 2.5 0 0 1 3 12.35h1a3.5 3.5 0 0 0-1.93-3.13l-.45.9zM3 5.65a2.5 2.5 0 0 1-1.38 2.23l.45.9A3.5 3.5 0 0 0 4 5.65H3zm11 7.85c0 .83-.67 1.5-1.5 1.5v1a2.5 2.5 0 0 0 2.5-2.5h-1zM5.5 2A2.5 2.5 0 0 0 3 4.5h1C4 3.67 4.67 3 5.5 3V2z"></path>
-                    </svg>
-                  </span>
-                </div>
+              <div class="indicator-list-header">Available Indicators</div>
+              <div class="indicator-list-container">
+                <!-- Indicators will be loaded dynamically -->
               </div>
             </div>
           </div>
@@ -1774,7 +1991,41 @@ class OakViewChart extends HTMLElement {
       </div>
 
       <div class="main-content">
-        <div class="sidebar-left"></div>
+        <div class="sidebar-left">
+          <!-- Drawing Tools -->
+          <button class="toolbar-tool-button active" title="Cursor" aria-label="Cursor tool">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M3.5 3.5l13 6-6 1-1 6-6-13z"/>
+            </svg>
+          </button>
+          <button class="toolbar-tool-button" title="Crosshair" aria-label="Crosshair tool">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M10 1v7M10 12v7M1 10h7M12 10h7M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+            </svg>
+          </button>
+          <button class="toolbar-tool-button" title="Trend Line" aria-label="Trend line tool">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M4 16l12-12"/>
+            </svg>
+          </button>
+          <div class="toolbar-separator"></div>
+          <button class="toolbar-tool-button" title="Zoom In" aria-label="Zoom in">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M9 3a6 6 0 104.32 10.05l4.58 4.58 1.06-1.06-4.58-4.58A6 6 0 009 3zm0 2a4 4 0 110 8 4 4 0 010-8zM9 6v2H7v2h2v2h2v-2h2V8h-2V6H9z"/>
+            </svg>
+          </button>
+          <button class="toolbar-tool-button" title="Zoom Out" aria-label="Zoom out">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M9 3a6 6 0 104.32 10.05l4.58 4.58 1.06-1.06-4.58-4.58A6 6 0 009 3zm0 2a4 4 0 110 8 4 4 0 010-8zM7 8v2h6V8H7z"/>
+            </svg>
+          </button>
+          <div class="toolbar-separator"></div>
+          <button class="toolbar-tool-button toolbar-trash" title="Delete" aria-label="Delete drawings">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M8 2h4v2H8V2zM3 5h14v2H3V5zm2 3h10v9a1 1 0 01-1 1H6a1 1 0 01-1-1V8zm3 2v6h2v-6H8zm4 0v6h2v-6h-2z"/>
+            </svg>
+          </button>
+        </div>
         <div class="chart-area">
           <div class="chart-container"></div>
           <div class="bottom-bar"></div>
@@ -1827,6 +2078,139 @@ class OakViewChart extends HTMLElement {
     `;
 
     this.shadowRoot.append(style, container);
+  }
+
+  /**
+   * Update available intervals based on data provider
+   * @param {string} symbol - Symbol to check intervals for
+   * @private
+   */
+  updateAvailableIntervals(symbol) {
+    if (!this._dataProvider || typeof this._dataProvider.getAvailableIntervals !== 'function') {
+      return;
+    }
+
+    const intervalMenu = this.shadowRoot.querySelector('.interval-dropdown-menu');
+    if (!intervalMenu) return;
+
+    try {
+      const availableIntervals = this._dataProvider.getAvailableIntervals(symbol);
+      const baseInterval = this._dataProvider.getBaseInterval(symbol);
+
+      console.log(`Available intervals for ${symbol}:`, availableIntervals);
+      console.log(`Base interval: ${baseInterval}`);
+
+      // Define interval hierarchy (in ascending order of duration)
+      // Using both minute notation (1, 5, 60, 120) and H/D/W/M/Y notation
+      const intervalHierarchy = [
+        '1', '5', '15', '30',        // Minutes
+        '60', '120', '180', '240', '720',  // Hours (in minutes)
+        '1H', '2H', '4H', '12H',     // Hours (H notation)
+        '1D',                         // Days
+        '1W',                         // Weeks
+        '1M', '3M', '6M',            // Months
+        '1Y'                          // Years
+      ];
+
+      // Get intervals that can be displayed (available + all superior intervals)
+      const canDisplay = new Set([...availableIntervals]);
+
+      if (baseInterval) {
+        const baseIndex = intervalHierarchy.indexOf(baseInterval);
+        if (baseIndex !== -1) {
+          // Add all intervals superior to the base interval
+          for (let i = baseIndex + 1; i < intervalHierarchy.length; i++) {
+            canDisplay.add(intervalHierarchy[i]);
+          }
+        } else {
+          // If base interval not in hierarchy, calculate its duration and add superior intervals
+          console.log(`Base interval ${baseInterval} not in hierarchy, calculating superior intervals`);
+          const baseMinutes = this.parseIntervalToMinutes(baseInterval);
+          console.log(`Base interval ${baseInterval} = ${baseMinutes} minutes`);
+
+          // Add all intervals from hierarchy that are >= base duration
+          intervalHierarchy.forEach(interval => {
+            const intervalMinutes = this.parseIntervalToMinutes(interval);
+            if (intervalMinutes >= baseMinutes) {
+              console.log(`  Adding ${interval} (${intervalMinutes} minutes >= ${baseMinutes})`);
+              canDisplay.add(interval);
+            }
+          });
+          console.log('Final canDisplay set:', Array.from(canDisplay));
+        }
+      }
+
+      // Enable/disable interval items based on availability
+      intervalMenu.querySelectorAll('.dropdown-item[data-interval]').forEach(item => {
+        const interval = item.dataset.interval;
+
+        // Skip tick intervals (not relevant for CSV data)
+        if (interval.endsWith('T')) {
+          item.style.display = 'none';
+          return;
+        }
+
+        const isAvailable = canDisplay.has(interval);
+
+        if (isAvailable) {
+          item.style.display = '';
+          item.style.opacity = '1';
+          item.style.pointerEvents = 'auto';
+        } else {
+          item.style.display = 'none'; // Hide unavailable intervals
+        }
+      });
+
+      // Hide sections that have no visible items
+      intervalMenu.querySelectorAll('.interval-section').forEach(section => {
+        const visibleItems = section.querySelectorAll('.dropdown-item[data-interval]:not([style*="display: none"])');
+        if (visibleItems.length === 0) {
+          section.style.display = 'none';
+        } else {
+          section.style.display = '';
+        }
+      });
+
+    } catch (error) {
+      console.error('Failed to update available intervals:', error);
+    }
+  }
+
+  /**
+   * Parse interval string to minutes for comparison
+   * @param {string} interval - Interval string (e.g., '1', '60', '1H', '1D')
+   * @returns {number} Duration in minutes
+   * @private
+   */
+  parseIntervalToMinutes(interval) {
+    const match = interval.match(/^(\d+)([mHDWMY]?)$/i);
+    if (!match) {
+      console.warn('Unknown interval format:', interval);
+      return 1440; // Default to 1 day
+    }
+
+    const [, num, unit] = match;
+    const value = parseInt(num);
+
+    switch (unit.toUpperCase()) {
+      case '':      // Minutes (default)
+      case 'M':     // Minutes (when lowercase 'm' or when it's just a number)
+        // Check if it's actually months (uppercase M without number prefix conflicts)
+        if (unit === 'M' && interval.match(/^\d+M$/)) {
+          return value * 43200; // Approximate: 30 days
+        }
+        return value;
+      case 'H':     // Hours
+        return value * 60;
+      case 'D':     // Days
+        return value * 1440;
+      case 'W':     // Weeks
+        return value * 10080;
+      case 'Y':     // Years
+        return value * 525600; // Approximate: 365 days
+      default:
+        return 1440;
+    }
   }
 
   setupEventListeners() {
@@ -1909,8 +2293,24 @@ class OakViewChart extends HTMLElement {
           this.updateDataSlice();
           intervalMenu.classList.remove('show');
 
+          // Fetch data with new interval (with resampling if needed)
+          const symbol = this.getAttribute('symbol');
+          if (this._dataProvider && symbol) {
+            this._dataProvider.fetchHistorical(symbol, interval)
+              .then(data => {
+                this._data = data;
+                this._allData = data;
+                this.updateChartType();
+              })
+              .catch(error => {
+                console.error('Failed to load interval data:', error);
+              });
+          }
+
           this.dispatchEvent(new CustomEvent('interval-change', {
-            detail: { interval }
+            detail: { interval },
+            bubbles: true,
+            composed: true
           }));
         });
       });
@@ -2116,18 +2516,7 @@ class OakViewChart extends HTMLElement {
   }
 
   setupSymbolSearch() {
-    const POPULAR_SYMBOLS = [
-      { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' },
-      { symbol: 'TSLA', name: 'Tesla, Inc.', exchange: 'NASDAQ' },
-      { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ' },
-      { symbol: 'GOOGL', name: 'Alphabet Inc.', exchange: 'NASDAQ' },
-      { symbol: 'AMZN', name: 'Amazon.com, Inc.', exchange: 'NASDAQ' },
-      { symbol: 'NVDA', name: 'NVIDIA Corporation', exchange: 'NASDAQ' },
-      { symbol: 'META', name: 'Meta Platforms, Inc.', exchange: 'NASDAQ' },
-      { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', exchange: 'NYSE Arca' },
-      { symbol: 'QQQ', name: 'Invesco QQQ Trust', exchange: 'NASDAQ' },
-      { symbol: 'AMD', name: 'Advanced Micro Devices, Inc.', exchange: 'NASDAQ' },
-    ];
+    // No hardcoded symbols - will use data provider
 
     const modal = this.shadowRoot.querySelector('.symbol-search-modal');
     const symbolBtn = this.shadowRoot.querySelector('.symbol-button');
@@ -2138,7 +2527,7 @@ class OakViewChart extends HTMLElement {
     const categoryBtns = this.shadowRoot.querySelectorAll('.category-btn');
 
     let currentCategory = 'recent';
-    let recentSymbols = ['SPX', 'AAPL', 'TSLA']; // Could be loaded from localStorage
+    let recentSymbols = []; // Will be populated from data provider
 
     // Open modal when clicking symbol button
     symbolBtn.addEventListener('click', () => {
@@ -2200,6 +2589,9 @@ class OakViewChart extends HTMLElement {
       // Add to recent symbols
       recentSymbols = [symbol, ...recentSymbols.filter(s => s !== symbol)].slice(0, 10);
 
+      // Update available intervals for this symbol
+      this.updateAvailableIntervals(symbol);
+
       // Dispatch symbol-change event
       this.dispatchEvent(new CustomEvent('symbol-change', {
         detail: { symbol, interval: '1D' },
@@ -2233,36 +2625,29 @@ class OakViewChart extends HTMLElement {
 
     // Render symbols list
     const renderSymbols = async () => {
-      const searchTerm = searchInput.value.toUpperCase();
-      let symbols;
+      const searchTerm = searchInput.value.toLowerCase();
+      let symbols = [];
 
-      if (searchTerm.length >= 2) {
-        // Try to use data provider for search if available
-        if (this._dataProvider && typeof this._dataProvider.searchSymbols === 'function') {
-          try {
-            symbols = await this._dataProvider.searchSymbols(searchTerm);
-          } catch (error) {
-            console.error('Symbol search failed:', error);
-            symbols = POPULAR_SYMBOLS.filter(s =>
-              s.symbol.includes(searchTerm) || s.name.toUpperCase().includes(searchTerm)
-            );
+      // Always use data provider if available
+      if (this._dataProvider && typeof this._dataProvider.searchSymbols === 'function') {
+        try {
+          // Search with current term (or empty for all symbols)
+          symbols = await this._dataProvider.searchSymbols(searchTerm);
+
+          // Filter by category if not searching
+          if (!searchTerm) {
+            if (currentCategory === 'recent' && recentSymbols.length > 0) {
+              symbols = symbols.filter(s => recentSymbols.includes(s.symbol));
+            }
+            // For 'popular' or other categories, show all available symbols
           }
-        } else {
-          // Fallback to filtering popular symbols
-          symbols = POPULAR_SYMBOLS.filter(s =>
-            s.symbol.includes(searchTerm) || s.name.toUpperCase().includes(searchTerm)
-          );
+        } catch (error) {
+          console.error('Symbol search failed:', error);
+          symbols = [];
         }
-      } else if (currentCategory === 'recent') {
-        symbols = recentSymbols.map(sym => ({
-          symbol: sym,
-          name: sym,
-          exchange: 'Recent'
-        }));
-      } else if (currentCategory === 'popular') {
-        symbols = POPULAR_SYMBOLS;
       } else {
-        symbols = POPULAR_SYMBOLS;
+        // No data provider - show message
+        symbols = [];
       }
 
       const currentSymbol = this.getAttribute('symbol');
@@ -2279,6 +2664,8 @@ class OakViewChart extends HTMLElement {
       } else {
         symbolList.innerHTML = symbols.map(item => {
           const isActive = currentSymbol === item.symbol;
+          const name = item.description || item.name || item.symbol;
+          const exchange = item.primaryExchange || item.exchange || 'CSV';
           return `
             <button class="symbol-item ${isActive ? 'active' : ''}" data-symbol="${item.symbol}">
               <div class="symbol-item-info">
@@ -2289,9 +2676,8 @@ class OakViewChart extends HTMLElement {
                     ${isActive ? '<span class="symbol-item-badge">Active</span>' : ''}
                   </div>
                   <div class="symbol-item-name">
-                    <span>${item.name}</span>
-                    <span>•</span>
-                    <span>${item.exchange}</span>
+                    <span>${name}</span>
+                    ${exchange ? `<span>•</span><span>${exchange}</span>` : ''}
                   </div>
                 </div>
               </div>
@@ -2403,7 +2789,7 @@ class OakViewChart extends HTMLElement {
 
     switch(this._currentChartType) {
       case 'candlestick':
-        this._currentSeries = this._chart.addCandlestickSeries({
+        this._currentSeries = this._chart.addSeries('Candlestick', {
           upColor: '#26a69a',
           downColor: '#ef5350',
           borderVisible: false,
@@ -2414,7 +2800,7 @@ class OakViewChart extends HTMLElement {
         break;
 
       case 'bar':
-        this._currentSeries = this._chart.addBarSeries({
+        this._currentSeries = this._chart.addSeries('Bar', {
           upColor: '#26a69a',
           downColor: '#ef5350'
         });
@@ -2423,7 +2809,7 @@ class OakViewChart extends HTMLElement {
 
       case 'line':
         const lineData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addLineSeries({
+        this._currentSeries = this._chart.addSeries('Line', {
           color: '#2962ff',
           lineWidth: 2
         });
@@ -2432,7 +2818,7 @@ class OakViewChart extends HTMLElement {
 
       case 'area':
         const areaData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addAreaSeries({
+        this._currentSeries = this._chart.addSeries('Area', {
           topColor: 'rgba(41, 98, 255, 0.4)',
           bottomColor: 'rgba(41, 98, 255, 0.0)',
           lineColor: 'rgba(41, 98, 255, 1)',
@@ -2443,7 +2829,7 @@ class OakViewChart extends HTMLElement {
 
       case 'baseline':
         const baselineData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addBaselineSeries({
+        this._currentSeries = this._chart.addSeries('Baseline', {
           topLineColor: '#26a69a',
           topFillColor1: 'rgba(38, 166, 154, 0.28)',
           topFillColor2: 'rgba(38, 166, 154, 0.05)',
@@ -2457,7 +2843,7 @@ class OakViewChart extends HTMLElement {
 
       default:
         // Fallback to candlestick
-        this._currentSeries = this._chart.addCandlestickSeries({
+        this._currentSeries = this._chart.addSeries('Candlestick', {
           upColor: '#26a69a',
           downColor: '#ef5350',
           borderVisible: false,
@@ -2555,7 +2941,7 @@ class OakViewChart extends HTMLElement {
   }
 
   addHistogramSeries(data = [], options = {}) {
-    const series = this._chart.addHistogramSeries(options);
+    const series = this._chart.addSeries('Histogram', options);
     if (data.length > 0) {
       series.setData(data);
     }

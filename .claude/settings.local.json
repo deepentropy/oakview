@@ -21,7 +21,9 @@
       "Bash(cmd /c \"mkdir data-providers 2>nul & echo Done\")",
       "Bash(cmd /c:*)",
       "Bash(cp:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

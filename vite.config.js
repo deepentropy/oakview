@@ -2,7 +2,18 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
-  root: 'example',
+  root: 'examples/csv-example',
+  server: {
+    fs: {
+      // Allow serving files from parent directory (oakscript-engine)
+      allow: [
+        // Search up for workspace root
+        resolve(__dirname, '..'),
+        // Allow the oakscript-engine folder
+        'C:/Users/otrem/PycharmProjects/oakscript-engine'
+      ]
+    }
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/oakview-chart.js'),

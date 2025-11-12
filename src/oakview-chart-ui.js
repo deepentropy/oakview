@@ -1,4 +1,12 @@
-import { createChart } from 'lightweight-charts';
+import {
+  createChart,
+  CandlestickSeries,
+  BarSeries,
+  LineSeries,
+  AreaSeries,
+  BaselineSeries,
+  HistogramSeries
+} from 'lightweight-charts';
 import cssVariables from './oakview-variables.css?inline';
 
 // CSV Loader utility
@@ -2789,7 +2797,7 @@ class OakViewChart extends HTMLElement {
 
     switch(this._currentChartType) {
       case 'candlestick':
-        this._currentSeries = this._chart.addSeries('Candlestick', {
+        this._currentSeries = this._chart.addSeries(CandlestickSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350',
           borderVisible: false,
@@ -2800,7 +2808,7 @@ class OakViewChart extends HTMLElement {
         break;
 
       case 'bar':
-        this._currentSeries = this._chart.addSeries('Bar', {
+        this._currentSeries = this._chart.addSeries(BarSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350'
         });
@@ -2809,7 +2817,7 @@ class OakViewChart extends HTMLElement {
 
       case 'line':
         const lineData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addSeries('Line', {
+        this._currentSeries = this._chart.addSeries(LineSeries, {
           color: '#2962ff',
           lineWidth: 2
         });
@@ -2818,7 +2826,7 @@ class OakViewChart extends HTMLElement {
 
       case 'area':
         const areaData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addSeries('Area', {
+        this._currentSeries = this._chart.addSeries(AreaSeries, {
           topColor: 'rgba(41, 98, 255, 0.4)',
           bottomColor: 'rgba(41, 98, 255, 0.0)',
           lineColor: 'rgba(41, 98, 255, 1)',
@@ -2829,7 +2837,7 @@ class OakViewChart extends HTMLElement {
 
       case 'baseline':
         const baselineData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addSeries('Baseline', {
+        this._currentSeries = this._chart.addSeries(BaselineSeries, {
           topLineColor: '#26a69a',
           topFillColor1: 'rgba(38, 166, 154, 0.28)',
           topFillColor2: 'rgba(38, 166, 154, 0.05)',
@@ -2843,7 +2851,7 @@ class OakViewChart extends HTMLElement {
 
       default:
         // Fallback to candlestick
-        this._currentSeries = this._chart.addSeries('Candlestick', {
+        this._currentSeries = this._chart.addSeries(CandlestickSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350',
           borderVisible: false,
@@ -2941,7 +2949,7 @@ class OakViewChart extends HTMLElement {
   }
 
   addHistogramSeries(data = [], options = {}) {
-    const series = this._chart.addSeries('Histogram', options);
+    const series = this._chart.addSeries(HistogramSeries, options);
     if (data.length > 0) {
       series.setData(data);
     }

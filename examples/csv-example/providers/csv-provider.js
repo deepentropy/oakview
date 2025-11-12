@@ -1,4 +1,4 @@
-import OakViewDataProvider from '../../../src/data-providers/base.js';
+import { OakViewDataProvider } from '../../../src/data-providers/index.js';
 
 /**
  * Enhanced CSV Data Provider

@@ -23,7 +23,8 @@
       "Bash(cp:*)",
       "Bash(rm:*)",
       "Bash(cat:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

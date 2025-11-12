@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
-  root: 'examples/csv-example',
+  root: '.', // Serve from project root to allow access to all examples
   server: {
     fs: {
       // Allow serving files from parent directory (oakscript-engine)

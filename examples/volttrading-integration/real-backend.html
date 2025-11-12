@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OakView + Real VoltTrading Backend Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #131722;
+      color: #d1d4dc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    oakview-chart-layout {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <oakview-chart-layout id="chart" layout="single" symbol="AAPL" theme="dark"></oakview-chart-layout>
+
+  <script type="module">
+    // Import OakView chart layout component (includes toolbar)
+    import '../../src/oakview-chart-layout.js';
+
+    // Import VoltTrading provider (example implementation)
+    import VoltTradingProvider from './volttrading-provider.js';
+
+    // Create real VoltTrading services
+    // Note: We need to create wrapper services that match VoltTrading's interface
+
+    class RealWebSocketService {
+      constructor() {
+        this.ws = null;
+        this.connected = false;
+        this.listeners = new Map();
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+      }
+
+      connect() {
+        const wsUrl = 'ws://localhost:8000/ws';
+        console.log(`[WebSocket] Connecting to ${wsUrl}...`);
+
+        try {
+          this.ws = new WebSocket(wsUrl);
+
+          this.ws.onopen = () => {
+            console.log('[WebSocket] Connected');
+            this.connected = true;
+            this.reconnectAttempts = 0;
+            this.emit('connected', {});
+          };
+
+          this.ws.onmessage = (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              this.emit(message.type, message.data);
+            } catch (error) {
+              console.error('[WebSocket] Failed to parse message:', error);
+            }
+          };
+
+          this.ws.onerror = (error) => {
+            console.error('[WebSocket] Error:', error);
+            this.emit('error', error);
+          };
+
+          this.ws.onclose = () => {
+            console.log('[WebSocket] Disconnected');
+            this.connected = false;
+            this.emit('disconnected', {});
+
+            // Auto-reconnect
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+              this.reconnectAttempts++;
+              console.log(`[WebSocket] Reconnecting (attempt ${this.reconnectAttempts})...`);
+              setTimeout(() => this.connect(), 3000);
+            }
+          };
+
+        } catch (error) {
+          console.error('[WebSocket] Connection failed:', error);
+          this.emit('error', error);
+        }
+      }
+
+      disconnect() {
+        console.log('[WebSocket] Disconnecting...');
+        this.reconnectAttempts = this.maxReconnectAttempts; // Prevent auto-reconnect
+        if (this.ws) {
+          this.ws.close();
+          this.ws = null;
+        }
+        this.connected = false;
+      }
+
+      isConnected() {
+        return this.connected;
+      }
+
+      on(event, callback) {
+        if (!this.listeners.has(event)) {
+          this.listeners.set(event, []);
+        }
+        this.listeners.get(event).push(callback);
+
+        // Return unsubscribe function
+        return () => {
+          const listeners = this.listeners.get(event);
+          if (listeners) {
+            const index = listeners.indexOf(callback);
+            if (index > -1) {
+              listeners.splice(index, 1);
+            }
+          }
+        };
+      }
+
+      emit(event, data) {
+        const listeners = this.listeners.get(event);
+        if (listeners) {
+          listeners.forEach(callback => {
+            try {
+              callback(data);
+            } catch (error) {
+              console.error(`[WebSocket] Error in ${event} listener:`, error);
+            }
+          });
+        }
+      }
+    }
+
+    class RealAPIService {
+      constructor(baseUrl = 'http://localhost:8000') {
+        this.baseUrl = baseUrl;
+      }
+
+      async getHistoricalData(symbol, duration, timeframe) {
+        console.log(`[API] GET /api/market-data/${symbol}/history?timeframe=${timeframe}&duration=${encodeURIComponent(duration)}`);
+
+        const url = `${this.baseUrl}/api/market-data/${symbol}/history?timeframe=${timeframe}&duration=${encodeURIComponent(duration)}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
+      }
+
+      async subscribeMarketData(symbols) {
+        console.log(`[API] POST /api/market-data/subscribe`);
+
+        const url = `${this.baseUrl}/api/market-data/subscribe`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(symbols)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
+      }
+
+      async unsubscribeMarketData(symbols) {
+        console.log(`[API] POST /api/market-data/unsubscribe`);
+
+        const url = `${this.baseUrl}/api/market-data/unsubscribe`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(symbols)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
+      }
+
+      async searchSymbols(query) {
+        console.log(`[API] GET /api/symbols/search?q=${query}`);
+
+        const url = `${this.baseUrl}/api/symbols/search?q=${encodeURIComponent(query)}`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
+      }
+    }
+
+    // Initialize services
+    const wsService = new RealWebSocketService();
+    const apiService = new RealAPIService();
+
+    // Create provider
+    const provider = new VoltTradingProvider({ wsService, apiService });
+
+    // UI elements
+    const chartLayout = document.getElementById('chart');
+
+    // State
+    let currentUnsubscribe = null;
+    let currentSymbol = 'AAPL';
+    let currentInterval = '1m';
+    let isLoading = false;
+
+    // Load chart data
+    async function loadChart(symbol, interval) {
+      // Prevent duplicate calls
+      if (isLoading) {
+        console.log('Already loading, skipping duplicate request');
+        return;
+      }
+
+      isLoading = true;
+
+      try {
+        console.log(`Loading chart: ${symbol} @ ${interval}`);
+
+        // IMPORTANT: Unsubscribe from previous FIRST
+        if (currentUnsubscribe) {
+          console.log('Unsubscribing from previous...');
+          currentUnsubscribe();
+          currentUnsubscribe = null;
+
+          // Wait a bit to ensure cleanup completes
+          await new Promise(resolve => setTimeout(resolve, 50));
+          console.log('Unsubscribed from previous symbol');
+        }
+
+        // Update symbol on layout (will update all charts)
+        chartLayout.setAttribute('symbol', symbol);
+
+        // Fetch historical
+        console.log('Fetching historical data...');
+        const historical = await provider.fetchHistorical(symbol, interval);
+        console.log(`Received ${historical.length} historical bars ✓`);
+
+        // Update ALL charts in the layout
+        const chartCount = chartLayout.getChartCount();
+        console.log(`Updating ${chartCount} chart(s) with data`);
+
+        for (let i = 0; i < chartCount; i++) {
+          const chart = chartLayout.getChartAt(i);
+          if (chart) {
+            console.log(`Setting data for chart ${i}`);
+            chart.setData(historical);
+          } else {
+            console.warn(`Chart ${i} not found!`);
+          }
+        }
+
+        console.log('All charts updated ✓');
+
+        // Subscribe to real-time updates for ALL charts
+        console.log('Subscribing to real-time updates...');
+
+        currentUnsubscribe = provider.subscribe(symbol, interval, (bar) => {
+          // Update all charts with the new bar
+          const chartCount = chartLayout.getChartCount();
+          for (let i = 0; i < chartCount; i++) {
+            const chart = chartLayout.getChartAt(i);
+            if (chart) {
+              chart.updateRealtime(bar);
+            }
+          }
+        });
+
+        console.log('Subscribed ✓');
+
+      } catch (error) {
+        console.error(`Error loading chart: ${error.message}`);
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    // Listen for interval changes from the top bar
+    chartLayout.addEventListener('interval-change', async (e) => {
+      console.log('Interval changed from toolbar:', e.detail);
+      currentInterval = e.detail.interval;
+      await loadChart(currentSymbol, currentInterval);
+    });
+
+    // Listen for symbol changes from the top bar
+    chartLayout.addEventListener('symbol-change', async (e) => {
+      console.log('Symbol changed from toolbar:', e.detail);
+      currentSymbol = e.detail.symbol;
+      await loadChart(currentSymbol, currentInterval);
+    });
+
+    // Listen for layout changes
+    window.addEventListener('layout-change', async (e) => {
+      console.log('Layout changed:', e.detail.layout);
+
+      // Wait for layout to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Reload chart for all panes (loadChart will handle unsubscribe)
+      await loadChart(currentSymbol, currentInterval);
+    });
+
+    // Auto-connect and load on startup
+    async function initialize() {
+      try {
+        console.log('Connecting to VoltTrading backend...');
+        await provider.initialize();
+        console.log('Provider initialized successfully ✓');
+
+        // Set provider on chart layout
+        chartLayout.setDataProvider(provider);
+        console.log('Data provider set on chart layout ✓');
+
+        // Load initial chart
+        await loadChart(currentSymbol, currentInterval);
+
+      } catch (error) {
+        console.error(`Initialization error: ${error.message}`);
+      }
+    }
+
+    // Start the app
+    initialize();
+  </script>
+</body>
+</html>

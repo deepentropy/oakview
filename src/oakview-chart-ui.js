@@ -59,9 +59,9 @@ class OakViewChart extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._chart = null;
-    this._series = new Map();
-    this._currentSeries = null;
+    this.chart = null;
+    this.series = new Map();
+    this.currentSeries = null;
     this._currentChartType = 'candlestick';
     this._data = [];
     this._allData = [];
@@ -140,10 +140,10 @@ class OakViewChart extends HTMLElement {
    * @public
    */
   updateRealtime(data) {
-    if (!this._currentSeries) return;
+    if (!this.currentSeries) return;
 
     try {
-      this._currentSeries.update(data);
+      this.currentSeries.update(data);
     } catch (error) {
       console.error('Failed to update realtime data:', error);
     }
@@ -166,7 +166,7 @@ class OakViewChart extends HTMLElement {
    * @public
    */
   getChart() {
-    return this._chart;
+    return this.chart;
   }
 
   /**
@@ -378,16 +378,16 @@ class OakViewChart extends HTMLElement {
       this._subscriptionUnsubscribe = null;
     }
 
-    if (this._chart) {
-      this._chart.remove();
-      this._chart = null;
+    if (this.chart) {
+      this.chart.remove();
+      this.chart = null;
     }
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue === newValue) return;
 
-    if (name === 'theme' && this._chart) {
+    if (name === 'theme' && this.chart) {
       this.applyTheme(newValue);
     }
 
@@ -396,7 +396,7 @@ class OakViewChart extends HTMLElement {
       if (symbolBtn) symbolBtn.textContent = newValue || 'SYMBOL';
     }
 
-    if (name === 'data-source' && newValue && this._chart) {
+    if (name === 'data-source' && newValue && this.chart) {
       // Load data when data-source attribute changes
       this.loadDataFromSource(newValue);
     }
@@ -2771,23 +2771,23 @@ class OakViewChart extends HTMLElement {
       },
     };
 
-    this._chart = createChart(container, chartOptions);
+    this.chart = createChart(container, chartOptions);
     console.log('✓ Chart created with autoSize');
     console.log('=== END CHART INIT ===');
 
     this.dispatchEvent(new CustomEvent('chart-ready', {
-      detail: { chart: this._chart }
+      detail: { chart: this.chart }
     }));
   }
 
   updateChartType() {
     console.log('=== updateChartType called ===');
-    console.log('Chart exists:', !!this._chart);
+    console.log('Chart exists:', !!this.chart);
     console.log('Data exists:', !!this._data);
     console.log('Data length:', this._data?.length || 0);
     console.log('Current chart type:', this._currentChartType);
 
-    if (!this._chart || !this._data || this._data.length === 0) {
+    if (!this.chart || !this._data || this._data.length === 0) {
       console.warn('⚠️ Cannot update chart type - missing chart or data');
       return;
     }
@@ -2797,47 +2797,47 @@ class OakViewChart extends HTMLElement {
 
     switch(this._currentChartType) {
       case 'candlestick':
-        this._currentSeries = this._chart.addSeries(CandlestickSeries, {
+        this.currentSeries = this.chart.addSeries(CandlestickSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350',
           borderVisible: false,
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350'
         });
-        this._currentSeries.setData(this._data);
+        this.currentSeries.setData(this._data);
         break;
 
       case 'bar':
-        this._currentSeries = this._chart.addSeries(BarSeries, {
+        this.currentSeries = this.chart.addSeries(BarSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350'
         });
-        this._currentSeries.setData(this._data);
+        this.currentSeries.setData(this._data);
         break;
 
       case 'line':
         const lineData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addSeries(LineSeries, {
+        this.currentSeries = this.chart.addSeries(LineSeries, {
           color: '#2962ff',
           lineWidth: 2
         });
-        this._currentSeries.setData(lineData);
+        this.currentSeries.setData(lineData);
         break;
 
       case 'area':
         const areaData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addSeries(AreaSeries, {
+        this.currentSeries = this.chart.addSeries(AreaSeries, {
           topColor: 'rgba(41, 98, 255, 0.4)',
           bottomColor: 'rgba(41, 98, 255, 0.0)',
           lineColor: 'rgba(41, 98, 255, 1)',
           lineWidth: 2
         });
-        this._currentSeries.setData(areaData);
+        this.currentSeries.setData(areaData);
         break;
 
       case 'baseline':
         const baselineData = this._data.map(d => ({ time: d.time, value: d.close }));
-        this._currentSeries = this._chart.addSeries(BaselineSeries, {
+        this.currentSeries = this.chart.addSeries(BaselineSeries, {
           topLineColor: '#26a69a',
           topFillColor1: 'rgba(38, 166, 154, 0.28)',
           topFillColor2: 'rgba(38, 166, 154, 0.05)',
@@ -2846,19 +2846,19 @@ class OakViewChart extends HTMLElement {
           bottomFillColor2: 'rgba(239, 83, 80, 0.28)',
           lineWidth: 2
         });
-        this._currentSeries.setData(baselineData);
+        this.currentSeries.setData(baselineData);
         break;
 
       default:
         // Fallback to candlestick
-        this._currentSeries = this._chart.addSeries(CandlestickSeries, {
+        this.currentSeries = this.chart.addSeries(CandlestickSeries, {
           upColor: '#26a69a',
           downColor: '#ef5350',
           borderVisible: false,
           wickUpColor: '#26a69a',
           wickDownColor: '#ef5350'
         });
-        this._currentSeries.setData(this._data);
+        this.currentSeries.setData(this._data);
     }
 
     this.fitContent();
@@ -2866,7 +2866,7 @@ class OakViewChart extends HTMLElement {
 
   applyTheme(theme) {
     const isDark = theme === 'dark';
-    this._chart.applyOptions({
+    this.chart.applyOptions({
       layout: {
         background: { color: isDark ? '#1E222D' : '#FFFFFF' },
         textColor: isDark ? '#D9D9D9' : '#191919',
@@ -2898,7 +2898,7 @@ class OakViewChart extends HTMLElement {
   }
 
   getChart() {
-    return this._chart;
+    return this.chart;
   }
 
   setData(data) {
@@ -2910,7 +2910,7 @@ class OakViewChart extends HTMLElement {
     this._data = data;
     this._currentChartType = 'candlestick';
     this.updateChartType();
-    return this._currentSeries;
+    return this.currentSeries;
   }
 
   addLineSeries(data = [], options = {}) {
@@ -2924,7 +2924,7 @@ class OakViewChart extends HTMLElement {
     this._data = candleData;
     this._currentChartType = 'line';
     this.updateChartType();
-    return this._currentSeries;
+    return this.currentSeries;
   }
 
   addAreaSeries(data = [], options = {}) {
@@ -2938,47 +2938,47 @@ class OakViewChart extends HTMLElement {
     this._data = candleData;
     this._currentChartType = 'area';
     this.updateChartType();
-    return this._currentSeries;
+    return this.currentSeries;
   }
 
   addBarSeries(data = [], options = {}) {
     this._data = data;
     this._currentChartType = 'bar';
     this.updateChartType();
-    return this._currentSeries;
+    return this.currentSeries;
   }
 
   addHistogramSeries(data = [], options = {}) {
-    const series = this._chart.addSeries(HistogramSeries, options);
+    const series = this.chart.addSeries(HistogramSeries, options);
     if (data.length > 0) {
       series.setData(data);
     }
-    const id = `histogram-${this._series.size}`;
-    this._series.set(id, series);
+    const id = `histogram-${this.series.size}`;
+    this.series.set(id, series);
     return series;
   }
 
   clearSeries() {
-    this._series.forEach(series => {
-      this._chart.removeSeries(series);
+    this.series.forEach(series => {
+      this.chart.removeSeries(series);
     });
-    this._series.clear();
+    this.series.clear();
 
-    if (this._currentSeries) {
-      this._chart.removeSeries(this._currentSeries);
-      this._currentSeries = null;
+    if (this.currentSeries) {
+      this.chart.removeSeries(this.currentSeries);
+      this.currentSeries = null;
     }
   }
 
   fitContent() {
-    if (this._chart) {
-      this._chart.timeScale().fitContent();
+    if (this.chart) {
+      this.chart.timeScale().fitContent();
     }
   }
 
   applyOptions(options) {
-    if (this._chart) {
-      this._chart.applyOptions(options);
+    if (this.chart) {
+      this.chart.applyOptions(options);
     }
   }
 }

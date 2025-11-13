@@ -158,15 +158,30 @@ class VoltTradingProvider extends OakViewDataProvider {
           ? timestamp
           : timestamp + 'Z'; // Add Z if naive UTC
 
-        const unixTime = Math.floor(new Date(dateStr).getTime() / 1000);
+        const date = new Date(dateStr);
 
-        if (isNaN(unixTime)) {
+        if (isNaN(date.getTime())) {
           console.error(`[VoltTradingProvider] Invalid timestamp "${timestamp}" at bar ${index}`);
           throw new Error(`Invalid timestamp: ${timestamp}`);
         }
 
+        // For daily/weekly/monthly timeframes, use BusinessDay format
+        // For intraday, use Unix timestamp
+        let timeValue;
+        if (voltInterval === '1D' || voltInterval.endsWith('W') || voltInterval.endsWith('M')) {
+          // BusinessDay format: { year, month, day }
+          timeValue = {
+            year: date.getUTCFullYear(),
+            month: date.getUTCMonth() + 1, // JavaScript months are 0-indexed, lightweight-charts expects 1-12
+            day: date.getUTCDate()
+          };
+        } else {
+          // Unix timestamp in seconds for intraday
+          timeValue = Math.floor(date.getTime() / 1000);
+        }
+
         const convertedBar = {
-          time: unixTime, // Unix seconds
+          time: timeValue,
           open: bar.open,
           high: bar.high,
           low: bar.low,
@@ -246,8 +261,12 @@ class VoltTradingProvider extends OakViewDataProvider {
         // Get current bar timestamp for this interval
         const currentBarTime = this._getCurrentBarTime(voltInterval);
 
+        // Check if we need to start a new bar
+        const existingBar = this.currentBars.get(key);
+        const isNewBar = !existingBar || !this._compareTimes(existingBar.time, currentBarTime);
+
         // Initialize or update current bar
-        if (!this.currentBars.has(key) || this.currentBars.get(key).time !== currentBarTime) {
+        if (isNewBar) {
           // New bar period
           this.currentBars.set(key, {
             time: currentBarTime,
@@ -481,24 +500,47 @@ class VoltTradingProvider extends OakViewDataProvider {
   }
 
   /**
-   * Get current bar start time for interval (Unix seconds)
+   * Compare two time values (handles both Unix timestamps and BusinessDay objects)
+   * @private
+   * @param {number|Object} time1 - Time value 1
+   * @param {number|Object} time2 - Time value 2
+   * @returns {boolean} True if times are equal
+   */
+  _compareTimes(time1, time2) {
+    // Both are numbers (Unix timestamps)
+    if (typeof time1 === 'number' && typeof time2 === 'number') {
+      return time1 === time2;
+    }
+
+    // Both are BusinessDay objects
+    if (typeof time1 === 'object' && typeof time2 === 'object') {
+      return time1.year === time2.year &&
+             time1.month === time2.month &&
+             time1.day === time2.day;
+    }
+
+    // Different types - not equal
+    return false;
+  }
+
+  /**
+   * Get current bar start time for interval
    * This logic matches VoltTrading's Chart.jsx:227-275
    * @private
    * @param {string} voltInterval - VoltTrading interval format
-   * @returns {number} Unix timestamp in seconds
+   * @returns {number|Object} Unix timestamp in seconds (for intraday) or BusinessDay object (for daily+)
    */
   _getCurrentBarTime(voltInterval) {
     const now = new Date();
 
     // Handle different timeframe formats
     if (voltInterval === '1D') {
-      // Daily - round to start of day in UTC
-      return Math.floor(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        0, 0, 0, 0
-      ) / 1000);
+      // Daily - return BusinessDay format { year, month, day }
+      return {
+        year: now.getUTCFullYear(),
+        month: now.getUTCMonth() + 1, // JavaScript months are 0-indexed
+        day: now.getUTCDate()
+      };
 
     } else if (voltInterval.endsWith('S')) {
       // Seconds (1S, 5S, 10S, etc.)
@@ -519,21 +561,24 @@ class VoltTradingProvider extends OakViewDataProvider {
       ) / 1000);
 
     } else if (voltInterval.endsWith('W')) {
-      // Weekly - round to start of week (Monday)
+      // Weekly - round to start of week (Monday) - BusinessDay format
       const dayOfWeek = now.getUTCDay();
       const daysToMonday = (dayOfWeek + 6) % 7; // 0 = Monday
       const monday = new Date(now);
       monday.setUTCDate(now.getUTCDate() - daysToMonday);
-      monday.setUTCHours(0, 0, 0, 0);
-      return Math.floor(monday.getTime() / 1000);
+      return {
+        year: monday.getUTCFullYear(),
+        month: monday.getUTCMonth() + 1,
+        day: monday.getUTCDate()
+      };
 
     } else if (voltInterval.endsWith('M')) {
-      // Monthly - round to start of month
-      return Math.floor(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        1, 0, 0, 0, 0
-      ) / 1000);
+      // Monthly - round to start of month - BusinessDay format
+      return {
+        year: now.getUTCFullYear(),
+        month: now.getUTCMonth() + 1,
+        day: 1
+      };
 
     } else {
       // Minutes or hours (numeric value = minutes)

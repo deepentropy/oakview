@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OakView + VoltTrading Provider Test</title>
+  <title>OakView + VoltTrading Integration</title>
   <style>
     * {
       margin: 0;
@@ -16,543 +16,253 @@
       color: #d1d4dc;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       height: 100vh;
-      display: flex;
-      flex-direction: column;
       overflow: hidden;
     }
 
-    header {
-      background: #1e222d;
-      padding: 16px 24px;
-      border-bottom: 1px solid #2a2e39;
-      flex-shrink: 0;
-    }
-
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      color: #ffffff;
-      margin-bottom: 12px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    input, select, button {
-      background: #2a2e39;
-      color: #d1d4dc;
-      border: 1px solid #363a45;
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      font-family: inherit;
-    }
-
-    input {
-      width: 120px;
-    }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: #2962ff;
-    }
-
-    button {
-      cursor: pointer;
-      transition: all 0.2s;
-      font-weight: 500;
-    }
-
-    button:hover:not(:disabled) {
-      transform: translateY(-1px);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    button.primary {
-      background: #2962ff;
-      border-color: #2962ff;
-      color: #ffffff;
-    }
-
-    button.primary:hover:not(:disabled) {
-      background: #1e53e5;
-    }
-
-    button.success {
-      background: #4caf50;
-      border-color: #4caf50;
-      color: #ffffff;
-    }
-
-    button.danger {
-      background: #f23645;
-      border-color: #f23645;
-      color: #ffffff;
-    }
-
-    button.danger:hover:not(:disabled) {
-      background: #cc2f3c;
-    }
-
-    .status {
-      font-size: 14px;
-      padding: 8px 12px;
-      border-radius: 4px;
-      margin-bottom: 8px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .status.connected {
-      background: rgba(76, 175, 80, 0.15);
-      color: #4caf50;
-      border: 1px solid #4caf50;
-    }
-
-    .status.disconnected {
-      background: rgba(242, 54, 69, 0.15);
-      color: #f23645;
-      border: 1px solid #f23645;
-    }
-
-    .status.connecting {
-      background: rgba(255, 152, 0, 0.15);
-      color: #ff9800;
-      border: 1px solid #ff9800;
-    }
-
-    .status-indicator {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-
-    .status.connected .status-indicator {
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    .content {
-      display: flex;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .chart-container {
-      flex: 1;
-      padding: 16px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    oakview-chart {
-      flex: 1;
-      min-height: 0;
-    }
-
-    .stats {
-      background: rgba(30, 34, 45, 0.95);
-      padding: 12px 16px;
-      border-radius: 6px;
-      border: 1px solid #2a2e39;
-      font-size: 12px;
-      color: #787b86;
-      margin-top: 12px;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
-    }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .stat-label {
-      color: #787b86;
-    }
-
-    .stat-value {
-      color: #d1d4dc;
-      font-weight: 500;
-    }
-
-    .logs-container {
-      width: 400px;
-      background: #1e222d;
-      border-left: 1px solid #2a2e39;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .logs-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid #2a2e39;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .logs-header h2 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #ffffff;
-    }
-
-    .logs {
-      flex: 1;
-      padding: 8px;
-      overflow-y: auto;
-      font-family: 'Monaco', 'Courier New', monospace;
-      font-size: 11px;
-      line-height: 1.4;
-    }
-
-    .log-entry {
-      margin: 2px 0;
-      padding: 3px 6px;
-      border-radius: 3px;
-      word-break: break-all;
-    }
-
-    .log-entry.info {
-      color: #2196f3;
-      background: rgba(33, 150, 243, 0.1);
-    }
-
-    .log-entry.success {
-      color: #4caf50;
-      background: rgba(76, 175, 80, 0.1);
-    }
-
-    .log-entry.error {
-      color: #f44336;
-      background: rgba(244, 67, 54, 0.1);
-    }
-
-    .log-entry.warn {
-      color: #ff9800;
-      background: rgba(255, 152, 0, 0.1);
-    }
-
-    .clear-logs {
-      background: transparent;
-      border: none;
-      color: #787b86;
-      padding: 4px 8px;
-      font-size: 12px;
-    }
-
-    .clear-logs:hover {
-      color: #d1d4dc;
-    }
-
-    /* Scrollbar styling */
-    .logs::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .logs::-webkit-scrollbar-track {
-      background: #131722;
-    }
-
-    .logs::-webkit-scrollbar-thumb {
-      background: #2a2e39;
-      border-radius: 4px;
-    }
-
-    .logs::-webkit-scrollbar-thumb:hover {
-      background: #363a45;
+    oakview-chart-layout {
+      width: 100%;
+      height: 100vh;
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>🔌 OakView + VoltTrading Provider Integration Test</h1>
-
-    <div class="controls">
-      <input id="symbolInput" placeholder="Symbol" value="AAPL">
-      <select id="intervalSelect">
-        <option value="1s">1 Second</option>
-        <option value="5s">5 Seconds</option>
-        <option value="10s">10 Seconds</option>
-        <option value="30s">30 Seconds</option>
-        <option value="1m" selected>1 Minute</option>
-        <option value="5m">5 Minutes</option>
-        <option value="15m">15 Minutes</option>
-        <option value="30m">30 Minutes</option>
-        <option value="1h">1 Hour</option>
-        <option value="4h">4 Hours</option>
-        <option value="1D">1 Day</option>
-      </select>
-      <button id="loadBtn" class="primary">Load Chart</button>
-      <button id="connectBtn" class="success">Connect WebSocket</button>
-      <button id="disconnectBtn" class="danger" disabled>Disconnect</button>
-    </div>
-
-    <div id="status" class="status disconnected">
-      <div class="status-indicator"></div>
-      <span>Disconnected</span>
-    </div>
-  </header>
-
-  <div class="content">
-    <div class="chart-container">
-      <oakview-chart id="chart" theme="dark"></oakview-chart>
-
-      <div class="stats">
-        <div class="stats-grid">
-          <div class="stat-row">
-            <span class="stat-label">Symbol:</span>
-            <span class="stat-value" id="statSymbol">-</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Interval:</span>
-            <span class="stat-value" id="statInterval">-</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Historical Bars:</span>
-            <span class="stat-value" id="statBars">-</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Updates Received:</span>
-            <span class="stat-value" id="statUpdates">0</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Last Update:</span>
-            <span class="stat-value" id="statLastUpdate">-</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Current Price:</span>
-            <span class="stat-value" id="statPrice">-</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="logs-container">
-      <div class="logs-header">
-        <h2>Console Output</h2>
-        <button id="clearLogs" class="clear-logs">Clear</button>
-      </div>
-      <div class="logs" id="logs">
-        <div class="log-entry info">📋 Waiting for initialization...</div>
-      </div>
-    </div>
-  </div>
+  <oakview-chart-layout id="chart" layout="single" symbol="AAPL" theme="dark"></oakview-chart-layout>
 
   <script type="module">
-    // Import OakView chart component
-    import '../../src/oakview-chart.js';
+    /**
+     * VoltTrading Integration Example
+     *
+     * This demonstrates how to use OakView with a custom data provider.
+     */
 
-    // Import VoltTrading provider and mock services
-    import { VoltTradingProvider } from '../../src/data-providers/index.js';
-    import { MockWebSocketService, MockAPIService } from './mock-services.js';
+    // Import OakView layout component
+    import '../../src/oakview-chart-layout.js';
 
-    // Initialize mock services
-    console.log('Initializing mock services...');
-    const wsService = new MockWebSocketService();
-    const apiService = new MockAPIService();
+    // Import custom VoltTrading provider
+    import VoltTradingProvider from './volttrading-provider.js';
 
-    // Create provider
-    console.log('Creating VoltTradingProvider...');
-    const provider = new VoltTradingProvider({ wsService, apiService });
+    // Simple WebSocket wrapper
+    class SimpleWebSocket {
+      constructor() {
+        this.ws = null;
+        this.listeners = new Map();
+      }
 
-    // UI elements
-    const chart = document.getElementById('chart');
-    const status = document.getElementById('status');
-    const logs = document.getElementById('logs');
-    const symbolInput = document.getElementById('symbolInput');
-    const intervalSelect = document.getElementById('intervalSelect');
-    const connectBtn = document.getElementById('connectBtn');
-    const disconnectBtn = document.getElementById('disconnectBtn');
-    const loadBtn = document.getElementById('loadBtn');
-    const clearLogsBtn = document.getElementById('clearLogs');
+      connect() {
+        this.ws = new WebSocket('ws://localhost:8000/ws');
 
-    // Stats elements
-    const statSymbol = document.getElementById('statSymbol');
-    const statInterval = document.getElementById('statInterval');
-    const statBars = document.getElementById('statBars');
-    const statUpdates = document.getElementById('statUpdates');
-    const statLastUpdate = document.getElementById('statLastUpdate');
-    const statPrice = document.getElementById('statPrice');
+        this.ws.onopen = () => {
+          console.log('Connected to VoltTrading backend');
+          this.emit('connected', {});
+        };
 
-    // State
-    let currentUnsubscribe = null;
-    let updateCount = 0;
+        this.ws.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          this.emit(message.type, message.data);
+        };
 
-    // Logging interceptor
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
+        this.ws.onclose = () => {
+          console.log('Disconnected from VoltTrading backend');
+          this.emit('disconnected', {});
+        };
+      }
 
-    function addLog(message, type = 'info') {
-      const entry = document.createElement('div');
-      entry.className = `log-entry ${type}`;
-      const time = new Date().toLocaleTimeString();
-      entry.textContent = `[${time}] ${message}`;
-      logs.appendChild(entry);
-      logs.scrollTop = logs.scrollHeight;
+      on(event, callback) {
+        if (!this.listeners.has(event)) {
+          this.listeners.set(event, []);
+        }
+        this.listeners.get(event).push(callback);
+        return () => {
+          const listeners = this.listeners.get(event);
+          if (listeners) {
+            const index = listeners.indexOf(callback);
+            if (index > -1) listeners.splice(index, 1);
+          }
+        };
+      }
 
-      // Keep only last 500 entries
-      while (logs.children.length > 500) {
-        logs.removeChild(logs.children[0]);
+      emit(event, data) {
+        const listeners = this.listeners.get(event);
+        if (listeners) {
+          listeners.forEach(callback => callback(data));
+        }
+      }
+
+      isConnected() {
+        return this.ws && this.ws.readyState === WebSocket.OPEN;
+      }
+
+      close() {
+        if (this.ws) this.ws.close();
       }
     }
 
-    console.log = (...args) => {
-      originalLog(...args);
-      addLog(args.join(' '), 'info');
-    };
+    // Simple API wrapper
+    class SimpleAPI {
+      constructor() {
+        this.baseUrl = 'http://localhost:8000';
+      }
 
-    console.error = (...args) => {
-      originalError(...args);
-      addLog(args.join(' '), 'error');
-    };
+      async getHistoricalData(symbol, duration, timeframe) {
+        const url = `${this.baseUrl}/api/market-data/${symbol}/history?timeframe=${timeframe}&duration=${encodeURIComponent(duration)}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      }
 
-    console.warn = (...args) => {
-      originalWarn(...args);
-      addLog(args.join(' '), 'warn');
-    };
+      async subscribeMarketData(symbols) {
+        const url = `${this.baseUrl}/api/market-data/subscribe`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(symbols)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      }
 
-    // WebSocket status listeners
-    wsService.on('connected', () => {
-      status.className = 'status connected';
-      status.innerHTML = '<div class="status-indicator"></div><span>Connected</span>';
-      connectBtn.disabled = true;
-      disconnectBtn.disabled = false;
-      loadBtn.disabled = false;
-      addLog('WebSocket connected ✓', 'success');
-    });
+      async unsubscribeMarketData(symbols) {
+        const url = `${this.baseUrl}/api/market-data/unsubscribe`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(symbols)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      }
 
-    wsService.on('disconnected', () => {
-      status.className = 'status disconnected';
-      status.innerHTML = '<div class="status-indicator"></div><span>Disconnected</span>';
-      connectBtn.disabled = false;
-      disconnectBtn.disabled = true;
-      loadBtn.disabled = true;
-      addLog('WebSocket disconnected', 'warn');
-    });
+      async searchSymbols(query) {
+        const url = `${this.baseUrl}/api/symbols/search?q=${encodeURIComponent(query)}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      }
+    }
 
-    // Connect button
-    connectBtn.addEventListener('click', async () => {
+    // Per-pane subscriptions: paneId -> { unsubscribe, symbol, interval }
+    const paneSubscriptions = new Map();
+
+    // Initialize
+    async function init() {
       try {
-        status.className = 'status connecting';
-        status.innerHTML = '<div class="status-indicator"></div><span>Connecting...</span>';
-        addLog('Initializing provider...', 'info');
+        console.log('Initializing VoltTrading connection...');
+
+        const wsService = new SimpleWebSocket();
+        const apiService = new SimpleAPI();
+        const provider = new VoltTradingProvider({ wsService, apiService });
 
         await provider.initialize();
-        addLog('Provider initialized successfully ✓', 'success');
+        console.log('Provider initialized ✓');
 
-        // Also notify mock service about subscription
-        wsService.addSymbol(symbolInput.value || 'AAPL');
+        const chartLayout = document.getElementById('chart');
+        chartLayout.setDataProvider(provider);
+        console.log('Data provider configured ✓');
+
+        // Set up event listeners BEFORE loading data to catch any changes
+        // Listen for interval changes (per-pane)
+        chartLayout.addEventListener('interval-change', async (e) => {
+          const { interval, paneIndex, paneId, symbol } = e.detail;
+          if (paneIndex === undefined || paneId === undefined) {
+            console.warn('interval-change event missing paneIndex or paneId');
+            return;
+          }
+          console.log(`Interval changed to ${interval} for pane ${paneIndex} (${symbol})`);
+          await loadPane(paneIndex, paneId, symbol, interval, provider, chartLayout);
+        });
+
+        // Listen for symbol changes (per-pane)
+        chartLayout.addEventListener('symbol-change', async (e) => {
+          const { symbol, paneIndex, paneId } = e.detail;
+          if (paneIndex === undefined || paneId === undefined) {
+            console.warn('symbol-change event missing paneIndex or paneId');
+            return;
+          }
+          // Get current interval for this pane
+          const sub = paneSubscriptions.get(paneId);
+          const interval = sub?.interval || '1D';
+          console.log(`Symbol changed to ${symbol} for pane ${paneIndex}`);
+          await loadPane(paneIndex, paneId, symbol, interval, provider, chartLayout);
+        });
+
+        // Listen for layout changes
+        chartLayout.addEventListener('layout-change', async () => {
+          console.log('Layout changed, reloading all panes...');
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await loadAllPanes(provider, chartLayout);
+        });
+
+        // Load initial data for all panes (after event listeners are set up)
+        await loadAllPanes(provider, chartLayout);
+
+        console.log('\n✨ OakView is now connected to VoltTrading backend');
+        console.log('Try changing symbols, timeframes, or layouts using the toolbar!');
 
       } catch (error) {
-        addLog(`Initialization error: ${error.message}`, 'error');
-        status.className = 'status disconnected';
-        status.innerHTML = '<div class="status-indicator"></div><span>Error</span>';
+        console.error('Initialization failed:', error);
+        console.log('\n❌ Make sure the VoltTrading backend is running on http://localhost:8000');
       }
-    });
+    }
 
-    // Disconnect button
-    disconnectBtn.addEventListener('click', () => {
-      if (currentUnsubscribe) {
-        currentUnsubscribe();
-        currentUnsubscribe = null;
+    // Load all panes with their respective settings
+    async function loadAllPanes(provider, chartLayout) {
+      const chartCount = chartLayout.getChartCount();
+      console.log(`Loading ${chartCount} pane(s)...`);
+
+      for (let i = 0; i < chartCount; i++) {
+        const chart = chartLayout.getChartAt(i);
+        if (chart) {
+          const symbol = chart.getAttribute('symbol') || 'AAPL';
+          const interval = '1D'; // Default interval
+          const paneId = i; // Use index as paneId for now
+
+          await loadPane(i, paneId, symbol, interval, provider, chartLayout);
+        }
       }
+    }
 
-      provider.disconnect();
-      wsService.disconnect();
-      updateCount = 0;
-      statUpdates.textContent = '0';
-      addLog('Disconnected', 'warn');
-    });
-
-    // Load button
-    loadBtn.addEventListener('click', async () => {
-      const symbol = symbolInput.value.toUpperCase() || 'AAPL';
-      const interval = intervalSelect.value || '1m';
-
+    // Load a single pane with specific symbol and interval
+    async function loadPane(paneIndex, paneId, symbol, interval, provider, chartLayout) {
       try {
-        addLog(`Loading chart: ${symbol} @ ${interval}`, 'info');
+        const chart = chartLayout.getChartAt(paneIndex);
+        if (!chart) return;
 
-        // Unsubscribe from previous symbol
-        if (currentUnsubscribe) {
-          currentUnsubscribe();
-          addLog('Unsubscribed from previous symbol', 'info');
+        // Unsubscribe from previous subscription for this pane
+        const existingSub = paneSubscriptions.get(paneId);
+        if (existingSub?.unsubscribe) {
+          existingSub.unsubscribe();
         }
 
-        // Update stats
-        statSymbol.textContent = symbol;
-        statInterval.textContent = interval;
-        updateCount = 0;
-        statUpdates.textContent = '0';
-
         // Fetch historical data
-        addLog('Fetching historical data...', 'info');
         const historical = await provider.fetchHistorical(symbol, interval);
-        addLog(`Received ${historical.length} historical bars ✓`, 'success');
+        console.log(`[Pane ${paneIndex}] Loaded ${historical.length} bars for ${symbol} @ ${interval}`);
 
-        statBars.textContent = historical.length;
-
-        // Set chart data
+        // Update chart with data
         chart.setData(historical);
-        chart.fitContent();
-        addLog('Chart updated with historical data ✓', 'success');
 
-        // Subscribe to real-time updates
-        addLog('Subscribing to real-time updates...', 'info');
-
-        // Notify mock service
-        wsService.addSymbol(symbol);
-
-        currentUnsubscribe = provider.subscribe(symbol, interval, (bar) => {
-          chart.updateRealtime(bar);
-          updateCount++;
-          statUpdates.textContent = updateCount;
-          statLastUpdate.textContent = new Date().toLocaleTimeString();
-          statPrice.textContent = `$${bar.close.toFixed(2)}`;
-
-          if (updateCount % 10 === 0) {
-            addLog(`Update #${updateCount}: $${bar.close.toFixed(2)}`, 'info');
+        // Subscribe to real-time updates for this pane only
+        const unsubscribe = provider.subscribe(symbol, interval, (bar) => {
+          // Make sure chart still exists and matches current subscription
+          const currentSub = paneSubscriptions.get(paneId);
+          if (currentSub && currentSub.symbol === symbol && currentSub.interval === interval) {
+            const currentChart = chartLayout.getChartAt(paneIndex);
+            if (currentChart) {
+              currentChart.updateRealtime(bar);
+            }
           }
         });
 
-        addLog('Subscribed to real-time updates ✓', 'success');
+        // Store subscription info
+        paneSubscriptions.set(paneId, { unsubscribe, symbol, interval });
 
+        console.log(`[Pane ${paneIndex}] Subscribed to ${symbol} @ ${interval}`);
       } catch (error) {
-        addLog(`Error: ${error.message}`, 'error');
-        console.error(error);
+        console.error(`[Pane ${paneIndex}] Error loading chart:`, error);
       }
-    });
+    }
 
-    // Clear logs button
-    clearLogsBtn.addEventListener('click', () => {
-      logs.innerHTML = '<div class="log-entry info">📋 Logs cleared</div>';
-    });
-
-    // Auto-connect on load
-    addLog('Page loaded. Click "Connect WebSocket" to begin.', 'info');
+    // Start
+    init();
   </script>
 </body>
 </html>

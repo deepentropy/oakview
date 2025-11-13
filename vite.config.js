@@ -16,7 +16,7 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/oakview-chart.js'),
+      entry: resolve(__dirname, 'src/index.js'),
       name: 'OakView',
       formats: ['es', 'umd'],
       fileName: (format) => `oakview.${format}.js`

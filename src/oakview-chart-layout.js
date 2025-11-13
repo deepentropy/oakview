@@ -25,6 +25,9 @@ class OakViewChartLayout extends HTMLElement {
     this._selectedPane = 0;
     this._layoutMode = 'single';
     this._dataProvider = null;
+    this._expandedPane = null; // Track which pane is expanded
+    this._previousLayout = null; // Store layout before expansion
+    this._paneSettings = new Map(); // Store per-pane settings (symbol, interval, etc.)
   }
 
   static get observedAttributes() {
@@ -222,6 +225,12 @@ class OakViewChartLayout extends HTMLElement {
         grid-template-rows: 1fr 1fr 1fr;
       }
 
+      /* Expanded state - single pane takes full space */
+      .grid-expanded {
+        grid-template-columns: 1fr !important;
+        grid-template-rows: 1fr !important;
+      }
+
       .chart-pane {
         background: var(--bg-primary);
         position: relative;
@@ -229,6 +238,10 @@ class OakViewChartLayout extends HTMLElement {
         border: 2px solid transparent;
         transition: border-color var(--transition-normal);
         cursor: pointer;
+      }
+
+      .chart-pane.hidden {
+        display: none;
       }
 
       .chart-pane:hover {
@@ -331,12 +344,24 @@ class OakViewChartLayout extends HTMLElement {
       paneDiv.className = `chart-pane ${index === this._selectedPane ? 'selected' : ''}`;
       paneDiv.dataset.paneId = config.id;
 
+      // Get or initialize settings for this pane
+      const paneId = config.id;
+      if (!this._paneSettings.has(paneId)) {
+        // Initialize with default settings from layout attributes
+        this._paneSettings.set(paneId, {
+          symbol: this.getAttribute('symbol') || 'SYMBOL',
+          interval: '1D', // Default interval
+        });
+      }
+      const settings = this._paneSettings.get(paneId);
+
       // Create chart element WITHOUT toolbar
       const chart = document.createElement('oakview-chart');
       chart.className = 'pane-chart';
       chart.setAttribute('theme', this.getAttribute('theme') || 'dark');
       chart.setAttribute('show-toolbar', 'false');
       chart.setAttribute('hide-sidebar', 'true'); // Hide left sidebar
+      chart.setAttribute('symbol', settings.symbol); // Set pane-specific symbol
 
       const dataSource = this.getAttribute('data-source');
       if (dataSource) {
@@ -366,8 +391,14 @@ class OakViewChartLayout extends HTMLElement {
       }, { once: true });
 
       // Click handler to select pane
-      paneDiv.addEventListener('click', () => {
-        this.selectPane(index);
+      paneDiv.addEventListener('click', (e) => {
+        // Alt+Left-Click handler to expand/collapse pane
+        if (e.altKey) {
+          e.preventDefault();
+          this.togglePaneExpansion(index);
+        } else {
+          this.selectPane(index);
+        }
       });
 
       paneDiv.appendChild(chart);
@@ -388,14 +419,52 @@ class OakViewChartLayout extends HTMLElement {
     const controlChart = this.shadowRoot.querySelector('.control-chart');
     if (!controlChart) return;
 
+    // Listen for symbol changes
+    controlChart.addEventListener('symbol-change', (e) => {
+      const selectedChart = this.getSelectedChart();
+      if (selectedChart && this._panes.length > 0 && this._selectedPane < this._panes.length) {
+        const paneId = this._panes[this._selectedPane].id;
+
+        // Update stored settings for this pane
+        const settings = this._paneSettings.get(paneId);
+        if (settings) {
+          settings.symbol = e.detail.symbol;
+        }
+
+        // Update the chart's symbol attribute
+        selectedChart.setAttribute('symbol', e.detail.symbol);
+
+        // Dispatch event for external app to load new data
+        this.dispatchEvent(new CustomEvent('symbol-change', {
+          detail: {
+            symbol: e.detail.symbol,
+            paneIndex: this._selectedPane,
+            paneId: paneId
+          }
+        }));
+      }
+    });
+
     // Listen for interval changes
     controlChart.addEventListener('interval-change', (e) => {
       const selectedChart = this.getSelectedChart();
-      if (selectedChart) {
-        // Apply interval change to focused chart
-        // This would need to be implemented in the chart component
+      if (selectedChart && this._panes.length > 0 && this._selectedPane < this._panes.length) {
+        const paneId = this._panes[this._selectedPane].id;
+
+        // Update stored settings for this pane
+        const settings = this._paneSettings.get(paneId);
+        if (settings) {
+          settings.interval = e.detail.interval;
+        }
+
+        // Dispatch event for external app to load new data
         this.dispatchEvent(new CustomEvent('interval-change', {
-          detail: { interval: e.detail.interval, paneIndex: this._selectedPane }
+          detail: {
+            interval: e.detail.interval,
+            paneIndex: this._selectedPane,
+            paneId: paneId,
+            symbol: settings?.symbol
+          }
         }));
       }
     });
@@ -440,18 +509,84 @@ class OakViewChartLayout extends HTMLElement {
     // Update control chart to reflect focused chart's properties
     const selectedChart = this._panes[index].chart;
     const controlChart = this.shadowRoot.querySelector('.control-chart');
+    const paneId = this._panes[index].id;
+    const settings = this._paneSettings.get(paneId);
 
-    if (controlChart && selectedChart) {
-      const symbol = selectedChart.getAttribute('symbol');
-      if (symbol) {
-        controlChart.setAttribute('symbol', symbol);
-      }
+    if (controlChart && selectedChart && settings) {
+      // Update control chart to show the selected pane's symbol
+      controlChart.setAttribute('symbol', settings.symbol);
+
+      // Note: We could also update interval display here if the control chart
+      // had a way to display/set the current interval
     }
 
     // Dispatch event
     this.dispatchEvent(new CustomEvent('pane-selected', {
-      detail: { paneIndex: index, paneId: this._panes[index].id }
+      detail: {
+        paneIndex: index,
+        paneId: paneId,
+        symbol: settings?.symbol,
+        interval: settings?.interval
+      }
     }));
+  }
+
+  togglePaneExpansion(index) {
+    if (index < 0 || index >= this._panes.length) return;
+
+    const container = this.shadowRoot.querySelector('.layout-container');
+    if (!container) return;
+
+    // Check if we're currently in single layout mode
+    if (this._layoutMode === 'single') return;
+
+    // If a pane is already expanded
+    if (this._expandedPane !== null) {
+      // If clicking the same pane, collapse it
+      if (this._expandedPane === index) {
+        // Show all panes again
+        this._panes.forEach(pane => {
+          pane.element.classList.remove('hidden');
+        });
+
+        // Remove expanded grid class
+        container.classList.remove('grid-expanded');
+
+        // Restore previous layout
+        this._expandedPane = null;
+      } else {
+        // Clicking a different pane while expanded - switch to that pane
+        // Hide all panes except the new one
+        this._panes.forEach((pane, i) => {
+          if (i === index) {
+            pane.element.classList.remove('hidden');
+          } else {
+            pane.element.classList.add('hidden');
+          }
+        });
+
+        // Update expanded pane
+        this._expandedPane = index;
+        this.selectPane(index);
+      }
+    } else {
+      // No pane is expanded - expand the clicked pane
+      // Hide all panes except the clicked one
+      this._panes.forEach((pane, i) => {
+        if (i === index) {
+          pane.element.classList.remove('hidden');
+        } else {
+          pane.element.classList.add('hidden');
+        }
+      });
+
+      // Add expanded grid class to make the visible pane take full space
+      container.classList.add('grid-expanded');
+
+      // Track which pane is expanded
+      this._expandedPane = index;
+      this.selectPane(index);
+    }
   }
 
   // Public API
@@ -496,6 +631,27 @@ class OakViewChartLayout extends HTMLElement {
    */
   getLayout() {
     return this._layoutMode;
+  }
+
+  /**
+   * Get settings for a specific pane
+   * @param {number} index - Pane index (0-based)
+   * @returns {Object|null} Settings object with symbol and interval, or null if invalid index
+   */
+  getPaneSettings(index) {
+    if (index < 0 || index >= this._panes.length) return null;
+    const paneId = this._panes[index].id;
+    return this._paneSettings.get(paneId);
+  }
+
+  /**
+   * Get the pane ID for a given index
+   * @param {number} index - Pane index (0-based)
+   * @returns {number|null} Pane ID or null if invalid index
+   */
+  getPaneId(index) {
+    if (index < 0 || index >= this._panes.length) return null;
+    return this._panes[index].id;
   }
 
   /**

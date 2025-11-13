@@ -5,13 +5,11 @@
  * with built-in UI components and flexible data provider architecture.
  */
 
-// Main components
-export { default as OakViewChart } from './oakview-chart-ui.js';
+// Main component - full layout with toolbar
 export { default as OakViewChartLayout } from './oakview-chart-layout.js';
 
-// Data providers
-export {
-  OakViewDataProvider,
-  CSVDataProvider,
-  VoltTradingProvider
-} from './data-providers/index.js';
+// Data provider base class (for implementing custom providers)
+export { OakViewDataProvider } from './data-providers/index.js';
+
+// Re-export lightweight-charts for advanced usage
+export { createChart, ColorType, LineStyle, CrosshairMode } from 'lightweight-charts';

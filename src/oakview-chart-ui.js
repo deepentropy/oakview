@@ -143,7 +143,12 @@ class OakViewChart extends HTMLElement {
     if (!this.currentSeries) return;
 
     try {
-      this.currentSeries.update(data);
+      // Convert data format for line series
+      if (this._currentChartType === 'line') {
+        this.currentSeries.update({ time: data.time, value: data.close });
+      } else {
+        this.currentSeries.update(data);
+      }
     } catch (error) {
       console.error('Failed to update realtime data:', error);
     }
@@ -175,9 +180,9 @@ class OakViewChart extends HTMLElement {
   async loadIndicators() {
     try {
       // Hardcode indicators for now - TODO: load from external manifest
-      // Use relative paths from Vite root (examples/csv-example)
-      // Go up to oakview root, then to parent, then to oakscript-engine
-      const basePath = '../../oakscript-engine/examples/indicators';
+      // Indicators are now part of oakview project
+      // Use absolute path from project root (leading slash)
+      const basePath = '/src/indicators';
       const indicators = [
         {
           "id": "average-day-range",
@@ -291,13 +296,13 @@ class OakViewChart extends HTMLElement {
     if (isControlChart) {
       console.log('This is control chart, getting pane chart from parent layout');
       const layout = this.getRootNode().host; // Get the layout element
-      if (layout && layout.getChartAt) {
-        targetChart = layout.getChartAt(0); // Get first pane chart
+      if (layout && layout.getSelectedChart) {
+        targetChart = layout.getSelectedChart(); // Get selected pane chart
         console.log('Target chart:', targetChart);
       }
     }
 
-    if (!targetChart || !targetChart._chart) {
+    if (!targetChart || !targetChart.chart) {
       console.error('No target chart available');
       return;
     }
@@ -326,7 +331,7 @@ class OakViewChart extends HTMLElement {
       }
 
       // Get the main series from target chart
-      const mainSeries = targetChart._currentSeries || targetChart._series;
+      const mainSeries = targetChart.currentSeries || targetChart.series;
       console.log('Main series:', mainSeries);
 
       if (!mainSeries) {
@@ -335,7 +340,7 @@ class OakViewChart extends HTMLElement {
 
       // Create the indicator instance
       console.log(`Creating indicator with ${chartData.length} bars`);
-      const indicator = createFn(targetChart._chart, mainSeries, {}, chartData);
+      const indicator = createFn(targetChart.chart, mainSeries, {}, chartData);
       console.log('Indicator created:', indicator);
 
       // Attach the indicator to the chart
@@ -350,6 +355,33 @@ class OakViewChart extends HTMLElement {
         id: indicatorId,
         instance: indicator
       });
+
+      // Add indicator legend entry
+      await targetChart.addIndicatorLegend(indicatorId, indicator.metadata);
+
+      // Save indicator to configuration
+      if (isControlChart) {
+        // Get the layout element (control chart is in layout's shadow root)
+        const layout = this.getRootNode().host;
+
+        if (layout && layout.updatePaneConfig) {
+          const selectedPaneIndex = layout._selectedPane;
+          const paneId = layout.getPaneId(selectedPaneIndex);
+          const settings = layout.getPaneSettings(selectedPaneIndex);
+
+          if (settings && paneId !== null) {
+            // Add indicator to the list if not already there
+            if (!settings.indicators) {
+              settings.indicators = [];
+            }
+            if (!settings.indicators.includes(indicatorId)) {
+              settings.indicators.push(indicatorId);
+              layout.saveConfiguration();
+              console.log(`[OakView] Saved indicator ${indicatorId} to pane ${selectedPaneIndex}`);
+            }
+          }
+        }
+      }
 
     } catch (error) {
       console.error(`Failed to load indicator ${indicatorId}:`, error);
@@ -492,6 +524,104 @@ class OakViewChart extends HTMLElement {
         overflow: hidden;
         min-height: 0;
         background: var(--bg-primary);
+      }
+
+      .chart-legend {
+        position: absolute;
+        top: 8px;
+        left: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 10;
+        pointer-events: none;
+        user-select: none;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .legend-titles {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+
+      .legend-symbol {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .legend-separator {
+        color: var(--text-secondary);
+        opacity: 0.4;
+        font-size: 12px;
+      }
+
+      .legend-timeframe,
+      .legend-exchange {
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+
+      .legend-values {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+      }
+
+      .legend-value-item {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+
+      .legend-value-title {
+        color: var(--text-secondary);
+        opacity: 0.7;
+        font-weight: 400;
+      }
+
+      .legend-value-data {
+        color: var(--text-primary);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .indicators-legend {
+        position: absolute;
+        top: 32px; /* Position below the main legend (main legend is ~24px tall) */
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        z-index: 10;
+        pointer-events: none;
+        user-select: none;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      .indicator-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+
+      .indicator-legend-name {
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .indicator-legend-params {
+        color: var(--text-secondary);
+        opacity: 0.8;
+      }
+
+      .indicator-legend-value {
+        color: var(--text-primary);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
       }
 
       .toolbar-group {
@@ -2035,7 +2165,36 @@ class OakViewChart extends HTMLElement {
           </button>
         </div>
         <div class="chart-area">
-          <div class="chart-container"></div>
+          <div class="chart-container">
+            <div class="chart-legend">
+              <div class="legend-titles">
+                <span class="legend-symbol">${this.symbol || 'AAPL'}</span>
+                <span class="legend-separator">•</span>
+                <span class="legend-timeframe">1D</span>
+                <span class="legend-separator">•</span>
+                <span class="legend-exchange">NASDAQ</span>
+              </div>
+              <div class="legend-values">
+                <span class="legend-value-item">
+                  <span class="legend-value-title">O</span>
+                  <span class="legend-value-data" data-field="open">—</span>
+                </span>
+                <span class="legend-value-item">
+                  <span class="legend-value-title">H</span>
+                  <span class="legend-value-data" data-field="high">—</span>
+                </span>
+                <span class="legend-value-item">
+                  <span class="legend-value-title">L</span>
+                  <span class="legend-value-data" data-field="low">—</span>
+                </span>
+                <span class="legend-value-item">
+                  <span class="legend-value-title">C</span>
+                  <span class="legend-value-data" data-field="close">—</span>
+                </span>
+              </div>
+            </div>
+            <div class="indicators-legend"></div>
+          </div>
           <div class="bottom-bar"></div>
         </div>
         <div class="sidebar-right"></div>
@@ -2713,39 +2872,6 @@ class OakViewChart extends HTMLElement {
 
   initChart() {
     const container = this.shadowRoot.querySelector('.chart-container');
-    const host = this.shadowRoot.host;
-
-    console.log('=== CHART INIT DEBUG ===');
-    console.log('Host element:', host);
-    console.log('Host size:', host.clientWidth, 'x', host.clientHeight);
-    console.log('Host computed style:', window.getComputedStyle(host).display, window.getComputedStyle(host).height);
-    console.log('Container element:', container);
-    console.log('Container size:', container.clientWidth, 'x', container.clientHeight);
-    console.log('Container computed style:', window.getComputedStyle(container).display, window.getComputedStyle(container).height);
-    console.log('Container flex:', window.getComputedStyle(container).flex);
-    console.log('Container parent:', container.parentElement);
-    console.log('Parent computed style:', window.getComputedStyle(container.parentElement).display, window.getComputedStyle(container.parentElement).flexDirection);
-    console.log('Parent size:', container.parentElement.clientWidth, 'x', container.parentElement.clientHeight);
-    const mainContent = container.parentElement.parentElement;
-    console.log('Main-content:', mainContent);
-    console.log('Main-content size:', mainContent.clientWidth, 'x', mainContent.clientHeight);
-    console.log('Main-content computed:', window.getComputedStyle(mainContent).display, window.getComputedStyle(mainContent).flex);
-
-    // Check if container has zero height
-    if (container.clientHeight === 0) {
-      console.warn('⚠️ Container has ZERO height! Chart may not display properly.');
-      console.log('Waiting for next frame and retrying...');
-
-      // Try again after another frame
-      requestAnimationFrame(() => {
-        console.log('=== RETRY CHART INIT ===');
-        console.log('Container size after wait:', container.clientWidth, 'x', container.clientHeight);
-        if (container.clientHeight === 0) {
-          console.error('❌ Container STILL has zero height after waiting!');
-        }
-      });
-    }
-
     const chartOptions = {
       autoSize: true,
       layout: {
@@ -2772,8 +2898,31 @@ class OakViewChart extends HTMLElement {
     };
 
     this.chart = createChart(container, chartOptions);
-    console.log('✓ Chart created with autoSize');
-    console.log('=== END CHART INIT ===');
+
+    // Subscribe to crosshair move to update legend
+    this.chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.seriesData) {
+        // Reset to last bar when not hovering
+        if (this._data && this._data.length > 0) {
+          const lastBar = this._data[this._data.length - 1];
+          this.updateLegendValues(lastBar);
+        }
+        // Reset indicator values
+        this.updateIndicatorLegendValues(null);
+        return;
+      }
+
+      // Update main series legend
+      if (this.currentSeries) {
+        const data = param.seriesData.get(this.currentSeries);
+        if (data) {
+          this.updateLegendValues(data);
+        }
+      }
+
+      // Update indicator legends
+      this.updateIndicatorLegendValues(param.seriesData);
+    });
 
     this.dispatchEvent(new CustomEvent('chart-ready', {
       detail: { chart: this.chart }
@@ -2781,19 +2930,42 @@ class OakViewChart extends HTMLElement {
   }
 
   updateChartType() {
-    console.log('=== updateChartType called ===');
-    console.log('Chart exists:', !!this.chart);
-    console.log('Data exists:', !!this._data);
-    console.log('Data length:', this._data?.length || 0);
-    console.log('Current chart type:', this._currentChartType);
+    // If this is the control chart (toolbar), update the selected pane chart instead
+    let targetChart = this;
+    const isControlChart = this.classList.contains('control-chart');
 
+    if (isControlChart) {
+      const layout = this.getRootNode().host;
+      if (layout && layout.getSelectedChart) {
+        targetChart = layout.getSelectedChart();
+        if (!targetChart) {
+          console.warn('⚠️ No pane chart selected');
+          return;
+        }
+        // Update the target chart's type and trigger its update
+        targetChart._currentChartType = this._currentChartType;
+        targetChart.updateChartType();
+
+        // Save chart type to configuration (from control chart, we know the selected pane)
+        const selectedPaneIndex = layout._selectedPane;
+        const paneId = layout.getPaneId(selectedPaneIndex);
+        const settings = layout.getPaneSettings(selectedPaneIndex);
+        if (settings && paneId !== null) {
+          settings.chartType = this._currentChartType;
+          layout.saveConfiguration();
+          console.log(`[OakView] Saved chart type "${this._currentChartType}" for pane ${selectedPaneIndex}`);
+        }
+        return;
+      }
+    }
+
+    // This is a regular pane chart, update it directly
     if (!this.chart || !this._data || this._data.length === 0) {
       console.warn('⚠️ Cannot update chart type - missing chart or data');
       return;
     }
 
     this.clearSeries();
-    console.log('Adding series for type:', this._currentChartType);
 
     switch(this._currentChartType) {
       case 'candlestick':
@@ -2862,6 +3034,288 @@ class OakViewChart extends HTMLElement {
     }
 
     this.fitContent();
+  }
+
+  updateLegend(symbol, interval, exchange = 'NASDAQ') {
+    const legendElement = this.shadowRoot.querySelector('.chart-legend');
+    if (!legendElement) return;
+
+    // Update titles
+    const symbolEl = legendElement.querySelector('.legend-symbol');
+    const timeframeEl = legendElement.querySelector('.legend-timeframe');
+    const exchangeEl = legendElement.querySelector('.legend-exchange');
+
+    if (symbolEl && symbol) symbolEl.textContent = symbol;
+    if (timeframeEl && interval) timeframeEl.textContent = interval;
+    if (exchangeEl) exchangeEl.textContent = exchange;
+
+    // Update OHLC values with the last bar
+    if (this._data && this._data.length > 0) {
+      const lastBar = this._data[this._data.length - 1];
+      this.updateLegendValues(lastBar);
+    }
+  }
+
+  updateLegendValues(bar) {
+    const legendElement = this.shadowRoot.querySelector('.chart-legend');
+    if (!legendElement || !bar) return;
+
+    const formatPrice = (price) => {
+      if (price === null || price === undefined) return '—';
+      return price.toFixed(2);
+    };
+
+    const openEl = legendElement.querySelector('[data-field="open"]');
+    const highEl = legendElement.querySelector('[data-field="high"]');
+    const lowEl = legendElement.querySelector('[data-field="low"]');
+    const closeEl = legendElement.querySelector('[data-field="close"]');
+
+    if (openEl) openEl.textContent = formatPrice(bar.open);
+    if (highEl) highEl.textContent = formatPrice(bar.high);
+    if (lowEl) lowEl.textContent = formatPrice(bar.low);
+    if (closeEl) closeEl.textContent = formatPrice(bar.close);
+
+    // Color all OHLC values based on whether it's a bullish or bearish bar
+    if (bar.open !== undefined && bar.close !== undefined) {
+      const color = bar.close >= bar.open ? '#26a69a' : '#ef5350'; // Green if up, red if down
+
+      if (openEl) openEl.style.color = color;
+      if (highEl) highEl.style.color = color;
+      if (lowEl) lowEl.style.color = color;
+      if (closeEl) closeEl.style.color = color;
+    }
+  }
+
+  async addIndicatorLegend(indicatorId, metadata) {
+    console.log(`[OakView] Adding indicator legend for ${indicatorId}`, metadata);
+
+    // Determine if this is an overlay indicator or separate pane
+    const isOverlay = metadata?.overlay !== false; // Default to overlay if not specified
+    const paneIndex = isOverlay ? 0 : 1; // Overlay indicators on pane 0, non-overlay on pane 1
+
+    console.log(`[OakView] Indicator ${indicatorId}: overlay=${isOverlay}, paneIndex=${paneIndex}`);
+
+    let legendContainer;
+
+    if (isOverlay) {
+      // For overlay indicators, use the shadow root's indicators-legend container
+      legendContainer = this.shadowRoot.querySelector('.indicators-legend');
+
+      if (!legendContainer) {
+        console.warn(`[OakView] Could not find .indicators-legend in shadow root`);
+        return;
+      }
+    } else {
+      // For non-overlay indicators, use the pane's HTML element
+
+      // Wait for pane to be ready (retry up to 10 times with 100ms delay)
+      let paneElement = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const panes = this.chart.panes();
+        console.log(`[OakView] Available panes (attempt ${attempt + 1}):`, panes?.length || 0);
+        console.log(`[OakView] Looking for pane index ${paneIndex}`);
+
+        if (!panes || panes.length <= paneIndex) {
+          console.log(`[OakView] Waiting for pane ${paneIndex}... (have ${panes?.length || 0} panes)`);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          continue;
+        }
+
+        // Log all panes
+        panes.forEach((p, idx) => {
+          const el = p.getHTMLElement();
+          console.log(`[OakView] Pane ${idx}:`, el?.tagName, el?.className);
+        });
+
+        const targetPane = panes[paneIndex];
+        const trElement = targetPane.getHTMLElement();
+
+        if (trElement) {
+          console.log(`[OakView] Pane ${paneIndex} TR element:`, trElement.tagName);
+
+          // Find the TD element inside the TR (the actual pane content container)
+          const tdElement = trElement.querySelector('td');
+          if (tdElement) {
+            console.log(`[OakView] Found TD element inside pane ${paneIndex}`);
+            paneElement = tdElement;
+            break;
+          } else {
+            console.log(`[OakView] No TD element found in pane ${paneIndex}, retrying...`);
+          }
+        }
+
+        console.log(`[OakView] Pane element not ready yet, waiting...`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (!paneElement) {
+        console.warn(`[OakView] Could not get DOM element for pane ${paneIndex} after retries`);
+        return;
+      }
+
+      // Ensure the TD element has relative positioning for absolute legend positioning
+      if (paneElement.style.position !== 'relative' && paneElement.style.position !== 'absolute') {
+        paneElement.style.position = 'relative';
+      }
+
+      // Find or create legend container for this pane
+      legendContainer = paneElement.querySelector('.indicators-legend');
+
+      if (!legendContainer) {
+        legendContainer = document.createElement('div');
+        legendContainer.className = 'indicators-legend';
+
+        // Style the container - position at top for non-overlay panes
+        Object.assign(legendContainer.style, {
+          position: 'absolute',
+          top: '8px',
+          left: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+          zIndex: '10',
+          pointerEvents: 'none',
+          userSelect: 'none',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        });
+        paneElement.appendChild(legendContainer);
+        console.log(`[OakView] Created legend container in pane ${paneIndex} TD element`);
+      }
+    }
+
+    // Check if legend already exists
+    const existingLegend = legendContainer.querySelector(`[data-indicator-id="${indicatorId}"]`);
+    if (existingLegend) return;
+
+    // Get indicator display name
+    const displayName = metadata?.shortName || metadata?.title || metadata?.name || indicatorId;
+
+    // Extract parameters from metadata.inputs (OakScript format)
+    let paramsStr = '';
+    if (metadata?.inputs && Array.isArray(metadata.inputs)) {
+      const paramValues = metadata.inputs
+        .map(input => {
+          if (input.defval !== undefined) {
+            return input.defval.toString();
+          }
+          return null;
+        })
+        .filter(v => v !== null);
+
+      paramsStr = paramValues.join(', ');
+    }
+
+    // Get plot color from metadata
+    const plotColor = metadata?.plots?.[0]?.color || '#2196F3';
+
+    // Create legend entry
+    const legendItem = document.createElement('div');
+    legendItem.className = 'indicator-legend-item';
+    legendItem.setAttribute('data-indicator-id', indicatorId);
+    legendItem.setAttribute('data-plot-color', plotColor);
+    legendItem.setAttribute('data-pane-index', paneIndex.toString());
+
+    // Apply inline styles for the legend item
+    Object.assign(legendItem.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '12px'
+    });
+
+    legendItem.innerHTML = `
+      <span class="indicator-legend-name" style="font-weight: 500; color: var(--text-primary);">${displayName}</span>
+      ${paramsStr ? `<span class="indicator-legend-params" style="color: var(--text-secondary); opacity: 0.8;">${paramsStr}</span>` : ''}
+      <span class="indicator-legend-value" data-indicator-value="${indicatorId}" style="color: ${plotColor}; font-weight: 500; font-variant-numeric: tabular-nums;">—</span>
+    `;
+
+    legendContainer.appendChild(legendItem);
+
+    console.log(`[OakView] Added indicator legend for ${indicatorId} on pane ${paneIndex} (overlay: ${isOverlay})`);
+  }
+
+  removeIndicatorLegend(indicatorId) {
+    // Search for the legend across all panes
+    const panes = this.chart.panes();
+    if (!panes) return;
+
+    for (const pane of panes) {
+      const paneElement = pane.element?.();
+      if (paneElement) {
+        const legendContainer = paneElement.querySelector('.indicators-legend');
+        if (legendContainer) {
+          const legendItem = legendContainer.querySelector(`[data-indicator-id="${indicatorId}"]`);
+          if (legendItem) {
+            legendItem.remove();
+            return; // Found and removed, no need to search other panes
+          }
+        }
+      }
+    }
+  }
+
+  updateIndicatorLegendValues(seriesData) {
+    if (!this._indicators || this._indicators.length === 0) return;
+
+    // Collect all legend containers to search (shadow root + all panes)
+    const legendContainers = [];
+
+    // Add shadow root's indicators-legend container
+    const shadowLegendContainer = this.shadowRoot.querySelector('.indicators-legend');
+    if (shadowLegendContainer) {
+      legendContainers.push(shadowLegendContainer);
+    }
+
+    // Add pane legend containers
+    const panes = this.chart.panes();
+    if (panes) {
+      panes.forEach(pane => {
+        const trElement = pane.getHTMLElement();
+        if (trElement) {
+          const tdElement = trElement.querySelector('td');
+          if (tdElement) {
+            const legendContainer = tdElement.querySelector('.indicators-legend');
+            if (legendContainer) {
+              legendContainers.push(legendContainer);
+            }
+          }
+        }
+      });
+    }
+
+    // If seriesData is null, reset all values to dash
+    if (!seriesData) {
+      legendContainers.forEach(container => {
+        container.querySelectorAll('.indicator-legend-value').forEach(el => {
+          el.textContent = '—';
+        });
+      });
+      return;
+    }
+
+    // Update each indicator's value
+    seriesData.forEach((data, series) => {
+      // Try to find which indicator this series belongs to
+      const seriesIndex = Array.from(seriesData.keys()).indexOf(series);
+
+      // Skip the main series (index 0)
+      if (seriesIndex === 0 || !data || typeof data.value !== 'number') return;
+
+      // Find the corresponding indicator (offset by 1 since main series is first)
+      const indicatorIndex = seriesIndex - 1;
+      if (indicatorIndex < this._indicators.length) {
+        const indicator = this._indicators[indicatorIndex];
+
+        // Search for the legend element across all legend containers
+        for (const legendContainer of legendContainers) {
+          const valueEl = legendContainer.querySelector(`[data-indicator-value="${indicator.id}"]`);
+          if (valueEl) {
+            valueEl.textContent = data.value.toFixed(2);
+            break; // Found it, no need to search other containers
+          }
+        }
+      }
+    });
   }
 
   applyTheme(theme) {

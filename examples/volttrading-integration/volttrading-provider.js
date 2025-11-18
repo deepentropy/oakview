@@ -199,18 +199,40 @@ class VoltTradingProvider extends OakViewDataProvider {
 
       // IMPORTANT: Sort data in ascending order by time
       // lightweight-charts requires data to be sorted in ascending order
-      data.sort((a, b) => a.time - b.time);
+      data.sort((a, b) => {
+        const timeA = a.time;
+        const timeB = b.time;
+
+        // Handle BusinessDay objects (daily+ timeframes)
+        if (typeof timeA === 'object' && typeof timeB === 'object') {
+          if (timeA.year !== timeB.year) return timeA.year - timeB.year;
+          if (timeA.month !== timeB.month) return timeA.month - timeB.month;
+          return timeA.day - timeB.day;
+        }
+
+        // Handle Unix timestamps (intraday)
+        return timeA - timeB;
+      });
 
       // Remove duplicate timestamps by keeping only the last bar for each time
       // lightweight-charts requires unique timestamps
       const deduplicated = [];
-      const seenTimes = new Set();
+      const seenTimes = new Map();
+
+      // Helper to create a unique key for time (works for both objects and numbers)
+      const getTimeKey = (time) => {
+        if (typeof time === 'object') {
+          return `${time.year}-${time.month}-${time.day}`;
+        }
+        return time.toString();
+      };
 
       // Process in reverse to keep the last occurrence of each timestamp
       for (let i = data.length - 1; i >= 0; i--) {
         const bar = data[i];
-        if (!seenTimes.has(bar.time)) {
-          seenTimes.add(bar.time);
+        const timeKey = getTimeKey(bar.time);
+        if (!seenTimes.has(timeKey)) {
+          seenTimes.set(timeKey, true);
           deduplicated.unshift(bar); // Add to front to maintain order
         }
       }

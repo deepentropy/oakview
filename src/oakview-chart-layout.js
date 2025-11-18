@@ -28,6 +28,7 @@ class OakViewChartLayout extends HTMLElement {
     this._expandedPane = null; // Track which pane is expanded
     this._previousLayout = null; // Store layout before expansion
     this._paneSettings = new Map(); // Store per-pane settings (symbol, interval, etc.)
+    this._storageKey = 'oakview-layout-config'; // localStorage key
   }
 
   static get observedAttributes() {
@@ -36,10 +37,36 @@ class OakViewChartLayout extends HTMLElement {
 
   connectedCallback() {
     this.render();
+    const hadSavedConfig = this.loadConfiguration(); // Load saved config before setting up panes
+
+    // If we had saved config, apply the layout BEFORE setupPanes
+    if (hadSavedConfig && this._layoutMode) {
+      // Set the layout attribute (this will be picked up by setupPanes)
+      this.setAttribute('layout', this._layoutMode);
+    }
+
     this.setupPanes();
+
+    // Dispatch event so external app knows to load data for restored config
+    if (hadSavedConfig) {
+      // Use setTimeout to ensure panes are created first
+      setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('config-restored', {
+          detail: {
+            layout: this._layoutMode,
+            panes: Array.from(this._paneSettings.entries()).map(([id, settings]) => ({
+              id,
+              ...settings
+            }))
+          }
+        }));
+      }, 0);
+    }
   }
 
   disconnectedCallback() {
+    // Save configuration before cleanup
+    this.saveConfiguration();
     // Clean up panes
     this._panes = [];
   }
@@ -429,6 +456,8 @@ class OakViewChartLayout extends HTMLElement {
         const settings = this._paneSettings.get(paneId);
         if (settings) {
           settings.symbol = e.detail.symbol;
+          // Save configuration after symbol change
+          this.saveConfiguration();
         }
 
         // Update the chart's symbol attribute
@@ -455,6 +484,8 @@ class OakViewChartLayout extends HTMLElement {
         const settings = this._paneSettings.get(paneId);
         if (settings) {
           settings.interval = e.detail.interval;
+          // Save configuration after interval change
+          this.saveConfiguration();
         }
 
         // Dispatch event for external app to load new data
@@ -472,6 +503,8 @@ class OakViewChartLayout extends HTMLElement {
     // Listen for layout changes from the control toolbar
     controlChart.addEventListener('layout-change', (e) => {
       this.setLayout(e.detail.layout);
+      // Save configuration after layout change
+      this.saveConfiguration();
     });
 
     // Listen for other control events and forward to selected chart
@@ -683,6 +716,100 @@ class OakViewChartLayout extends HTMLElement {
    */
   getDataProvider() {
     return this._dataProvider;
+  }
+
+  // ============================================================================
+  // Configuration Storage
+  // ============================================================================
+
+  /**
+   * Load configuration from localStorage
+   * @private
+   * @returns {boolean} True if configuration was loaded
+   */
+  loadConfiguration() {
+    try {
+      const savedConfig = localStorage.getItem(this._storageKey);
+      if (!savedConfig) return false;
+
+      const config = JSON.parse(savedConfig);
+      console.log('[OakView] Loading saved configuration:', config);
+
+      // Restore layout mode
+      if (config.layout) {
+        this._layoutMode = config.layout;
+      }
+
+      // Restore pane settings
+      if (config.panes) {
+        config.panes.forEach(paneConfig => {
+          this._paneSettings.set(paneConfig.id, {
+            symbol: paneConfig.symbol,
+            interval: paneConfig.interval,
+            chartType: paneConfig.chartType || 'candlestick',
+            indicators: paneConfig.indicators || []
+          });
+        });
+      }
+
+      console.log('[OakView] Configuration loaded successfully');
+      return true;
+    } catch (error) {
+      console.error('[OakView] Failed to load configuration:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Save configuration to localStorage
+   * @private
+   */
+  saveConfiguration() {
+    try {
+      const config = {
+        layout: this._layoutMode,
+        panes: []
+      };
+
+      // Save each pane's settings
+      this._paneSettings.forEach((settings, paneId) => {
+        config.panes.push({
+          id: paneId,
+          symbol: settings.symbol,
+          interval: settings.interval,
+          chartType: settings.chartType,
+          indicators: settings.indicators || []
+        });
+      });
+
+      localStorage.setItem(this._storageKey, JSON.stringify(config));
+      console.log('[OakView] Configuration saved:', config);
+    } catch (error) {
+      console.error('[OakView] Failed to save configuration:', error);
+    }
+  }
+
+  /**
+   * Update pane configuration and save
+   * @param {number} paneId - Pane ID
+   * @param {Object} updates - Settings to update
+   * @public
+   */
+  updatePaneConfig(paneId, updates) {
+    const settings = this._paneSettings.get(paneId);
+    if (settings) {
+      Object.assign(settings, updates);
+      this.saveConfiguration();
+    }
+  }
+
+  /**
+   * Clear all saved configuration
+   * @public
+   */
+  clearConfiguration() {
+    localStorage.removeItem(this._storageKey);
+    console.log('[OakView] Configuration cleared');
   }
 }
 

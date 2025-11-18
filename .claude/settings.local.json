@@ -24,7 +24,10 @@
       "Bash(rm:*)",
       "Bash(cat:*)",
       "Bash(find:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(curl:*)",
+      "Bash(npm link)",
+      "Bash(npm link:*)"
     ],
     "deny": [],
     "ask": []

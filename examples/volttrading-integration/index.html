@@ -143,6 +143,60 @@
     // Per-pane subscriptions: paneId -> { unsubscribe, symbol, interval }
     const paneSubscriptions = new Map();
 
+    // Track if config was restored to avoid duplicate loading
+    let configWasRestored = false;
+
+    // Set up config restoration listener BEFORE init
+    // This must be done before the component connects to catch the config-restored event
+    const chartLayout = document.getElementById('chart');
+
+    chartLayout.addEventListener('config-restored', async (e) => {
+      console.log('Configuration restored:', e.detail);
+      configWasRestored = true;
+
+      // Wait for provider to be initialized
+      while (!window.voltProvider) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      const provider = window.voltProvider;
+
+      // Load data for each pane with restored settings
+      await loadAllPanes(provider, chartLayout);
+
+      // Restore indicators for each pane
+      console.log('Starting indicator restoration loop...');
+      for (const paneConfig of e.detail.panes) {
+        console.log(`Checking pane ${paneConfig.id}, indicators:`, paneConfig.indicators);
+        if (paneConfig.indicators && paneConfig.indicators.length > 0) {
+          console.log(`Restoring ${paneConfig.indicators.length} indicators for pane ${paneConfig.id}`);
+          // Wait for data to be loaded first
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Find the pane index from the id
+          const paneIndex = chartLayout._panes?.findIndex(p => p.id === paneConfig.id);
+          if (paneIndex >= 0) {
+            const chart = chartLayout.getChartAt(paneIndex);
+            if (chart) {
+              // Query indicator info from the indicator list DOM elements
+              for (const indicatorId of paneConfig.indicators) {
+                const indicatorItem = chart.shadowRoot?.querySelector(`.indicator-list-item[data-indicator-id="${indicatorId}"]`);
+                if (indicatorItem) {
+                  const indicatorModule = indicatorItem.getAttribute('data-indicator-module');
+                  const calculationModule = indicatorItem.getAttribute('data-indicator-calc');
+
+                  console.log(`Loading indicator: ${indicatorId}`);
+                  await chart.loadIndicatorOnChart(indicatorId, indicatorModule, calculationModule);
+                } else {
+                  console.warn(`Indicator ${indicatorId} not found in indicator list`);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
     // Initialize
     async function init() {
       try {
@@ -155,7 +209,9 @@
         await provider.initialize();
         console.log('Provider initialized ✓');
 
-        const chartLayout = document.getElementById('chart');
+        // Store provider globally so config-restored handler can access it
+        window.voltProvider = provider;
+
         chartLayout.setDataProvider(provider);
         console.log('Data provider configured ✓');
 
@@ -167,8 +223,11 @@
             console.warn('interval-change event missing paneIndex or paneId');
             return;
           }
+          // Get current chart type for this pane
+          const chart = chartLayout.getChartAt(paneIndex);
+          const chartType = chart?._currentChartType || 'candlestick';
           console.log(`Interval changed to ${interval} for pane ${paneIndex} (${symbol})`);
-          await loadPane(paneIndex, paneId, symbol, interval, provider, chartLayout);
+          await loadPane(paneIndex, paneId, symbol, interval, chartType, provider, chartLayout);
         });
 
         // Listen for symbol changes (per-pane)
@@ -178,11 +237,13 @@
             console.warn('symbol-change event missing paneIndex or paneId');
             return;
           }
-          // Get current interval for this pane
+          // Get current interval and chart type for this pane
           const sub = paneSubscriptions.get(paneId);
           const interval = sub?.interval || '1D';
+          const chart = chartLayout.getChartAt(paneIndex);
+          const chartType = chart?._currentChartType || 'candlestick';
           console.log(`Symbol changed to ${symbol} for pane ${paneIndex}`);
-          await loadPane(paneIndex, paneId, symbol, interval, provider, chartLayout);
+          await loadPane(paneIndex, paneId, symbol, interval, chartType, provider, chartLayout);
         });
 
         // Listen for layout changes
@@ -192,8 +253,11 @@
           await loadAllPanes(provider, chartLayout);
         });
 
-        // Load initial data for all panes (after event listeners are set up)
-        await loadAllPanes(provider, chartLayout);
+        // Load initial data for all panes only if config wasn't restored
+        // (If config was restored, the config-restored handler already loaded the panes)
+        if (!configWasRestored) {
+          await loadAllPanes(provider, chartLayout);
+        }
 
         console.log('\n✨ OakView is now connected to VoltTrading backend');
         console.log('Try changing symbols, timeframes, or layouts using the toolbar!');
@@ -212,17 +276,22 @@
       for (let i = 0; i < chartCount; i++) {
         const chart = chartLayout.getChartAt(i);
         if (chart) {
-          const symbol = chart.getAttribute('symbol') || 'AAPL';
-          const interval = '1D'; // Default interval
-          const paneId = i; // Use index as paneId for now
+          const paneId = chartLayout.getPaneId(i);
+          const settings = chartLayout.getPaneSettings(i);
 
-          await loadPane(i, paneId, symbol, interval, provider, chartLayout);
+          // Get symbol, interval, and chart type from saved settings or defaults
+          const symbol = settings?.symbol || chart.getAttribute('symbol') || 'AAPL';
+          const interval = settings?.interval || '1D';
+          const chartType = settings?.chartType || 'candlestick';
+
+          console.log(`[Pane ${i}] Loading with symbol=${symbol}, interval=${interval}, chartType=${chartType}`);
+          await loadPane(i, paneId, symbol, interval, chartType, provider, chartLayout);
         }
       }
     }
 
     // Load a single pane with specific symbol and interval
-    async function loadPane(paneIndex, paneId, symbol, interval, provider, chartLayout) {
+    async function loadPane(paneIndex, paneId, symbol, interval, chartType, provider, chartLayout) {
       try {
         const chart = chartLayout.getChartAt(paneIndex);
         if (!chart) return;
@@ -233,12 +302,20 @@
           existingSub.unsubscribe();
         }
 
+        // Set chart type before loading data
+        if (chartType && chart._currentChartType !== chartType) {
+          chart._currentChartType = chartType;
+        }
+
         // Fetch historical data
         const historical = await provider.fetchHistorical(symbol, interval);
         console.log(`[Pane ${paneIndex}] Loaded ${historical.length} bars for ${symbol} @ ${interval}`);
 
-        // Update chart with data
+        // Update chart with data (this will trigger updateChartType internally)
         chart.setData(historical);
+
+        // Update legend with current symbol, interval, and exchange
+        chart.updateLegend(symbol, interval, 'NASDAQ');
 
         // Subscribe to real-time updates for this pane only
         const unsubscribe = provider.subscribe(symbol, interval, (bar) => {

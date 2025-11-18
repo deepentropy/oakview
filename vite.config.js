@@ -5,12 +5,10 @@ export default defineConfig({
   root: '.', // Serve from project root to allow access to all examples
   server: {
     fs: {
-      // Allow serving files from parent directory (oakscript-engine)
+      // Allow serving files from parent directory if needed
       allow: [
         // Search up for workspace root
-        resolve(__dirname, '..'),
-        // Allow the oakscript-engine folder
-        'C:/Users/otrem/PycharmProjects/oakscript-engine'
+        resolve(__dirname, '..')
       ]
     }
   },

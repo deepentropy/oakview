@@ -19,7 +19,7 @@
       height: 100vh;
     }
 
-    oakview-chart-layout {
+    oakview {
       width: 100%;
       height: 100vh;
     }
@@ -65,16 +65,16 @@
     <div>Initializing CSV provider...</div>
   </div>
 
-  <oakview-chart-layout
+  <oakview
     id="chart"
     layout="single"
     symbol="QQQ"
     theme="dark">
-  </oakview-chart-layout>
+  </oakview>
 
   <script type="module">
     // Import OakView components and CSV provider
-    import '../../src/oakview-chart-layout.js';
+    import '../../dist/oakview.es.js';
     import CSVDataProvider from './providers/csv-provider.js';
 
     // Available CSV files (manually list them here)

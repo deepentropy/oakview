@@ -3,19 +3,17 @@ import './oakview-chart-ui.js';    // Chart with toolbar
 import cssVariables from './oakview-variables.css?inline';
 
 /**
- * OakView Chart Layout Component
- * Multi-chart layout with split screen support
+ * OakView - Multi-pane chart layout component
+ * Main entry point for OakView library
  *
  * Usage:
- *   <oakview-chart-layout layout="2x2" symbol="SPX"></oakview-chart-layout>
+ *   <oakview layout="single" symbol="SPX" theme="dark"></oakview>
  *
  * Supported layouts:
  *   - single: 1 chart
- *   - 2x1: 2 charts horizontally
- *   - 1x2: 2 charts vertically
- *   - 2x2: 4 charts in a grid
- *   - 3x1: 3 charts horizontally
- *   - 1x3: 3 charts vertically
+ *   - dual: 2 charts horizontally
+ *   - triple: 3 charts
+ *   - quad: 4 charts in a grid
  */
 class OakViewChartLayout extends HTMLElement {
   constructor() {
@@ -813,9 +811,9 @@ class OakViewChartLayout extends HTMLElement {
   }
 }
 
-// Register the custom element only if not already defined
-if (!customElements.get('oakview-chart-layout')) {
-  customElements.define('oakview-chart-layout', OakViewChartLayout);
+// Register custom element
+if (!customElements.get('oakview')) {
+  customElements.define('oakview', OakViewChartLayout);
 }
 
 export default OakViewChartLayout;

@@ -9,51 +9,17 @@ import {
 } from 'lightweight-charts';
 import cssVariables from './oakview-variables.css?inline';
 
-// CSV Loader utility
-async function loadCSV(url) {
-  const response = await fetch(url);
-  const text = await response.text();
-  const lines = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-
-  const data = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',');
-    if (values.length < headers.length) continue;
-
-    const row = {};
-    headers.forEach((header, index) => {
-      row[header] = values[index].trim();
-    });
-
-    const item = {
-      time: row.time || row.date,
-      open: parseFloat(row.open),
-      high: parseFloat(row.high),
-      low: parseFloat(row.low),
-      close: parseFloat(row.close)
-    };
-
-    if (row.volume !== undefined && row.volume !== 'NaN' && row.volume !== '') {
-      item.volume = parseFloat(row.volume);
-    }
-
-    if (isNaN(item.open) || isNaN(item.high) || isNaN(item.low) || isNaN(item.close)) {
-      continue;
-    }
-
-    data.push(item);
-  }
-
-  return data;
-}
-
 /**
  * OakView Chart Web Component with Built-in UI
  * A custom element wrapper for TradingView's Lightweight Charts with toolbar
  *
  * Usage:
- *   <oakview-chart symbol="SPX" data-source="data.csv" show-toolbar="true"></oakview-chart>
+ *   <oakview-chart symbol="SPX" show-toolbar="true"></oakview-chart>
+ *
+ * Data loading must be done via setData() method or data provider:
+ *   chart.setData(ohlcvData);
+ *   // or
+ *   chart.setDataProvider(myDataProvider);
  */
 class OakViewChart extends HTMLElement {
   constructor() {
@@ -64,14 +30,12 @@ class OakViewChart extends HTMLElement {
     this.currentSeries = null;
     this._currentChartType = 'candlestick';
     this._data = [];
-    this._allData = [];
-    this._currentDataPoints = 365;
     this._dataProvider = null;
     this._subscriptionUnsubscribe = null;
   }
 
   static get observedAttributes() {
-    return ['width', 'height', 'theme', 'symbol', 'show-toolbar', 'data-source', 'hide-sidebar'];
+    return ['width', 'height', 'theme', 'symbol', 'show-toolbar', 'hide-sidebar'];
   }
 
   async connectedCallback() {
@@ -82,33 +46,10 @@ class OakViewChart extends HTMLElement {
       this.initChart();
       this.setupEventListeners();
       this.loadIndicators();
-
-      // Load data if data-source is provided
-      const dataSource = this.getAttribute('data-source');
-      if (dataSource) {
-        this.loadDataFromSource(dataSource);
-      }
     });
 
     // No need for manual resize observer when using autoSize
     // The chart will automatically resize to fit its container
-  }
-
-  async loadDataFromSource(url) {
-    try {
-      console.log('Loading data from:', url);
-      this._allData = await loadCSV(url);
-      console.log('Data loaded:', this._allData.length, 'records');
-      this.updateDataSlice();
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    }
-  }
-
-  updateDataSlice() {
-    if (this._allData.length === 0) return;
-    this._data = this._allData.slice(-this._currentDataPoints);
-    this.updateChartType();
   }
 
   /**
@@ -156,19 +97,24 @@ class OakViewChart extends HTMLElement {
 
   /**
    * Set bulk data (replaces all existing data)
+   * This updates the current series based on the selected chart type.
+   * For advanced use cases, get the chart instance with getChart() and manage series directly.
    * @param {Array} data - Array of OHLCV data
    * @public
    */
   setData(data) {
-    this._allData = data;
     this._data = data;
     this.updateChartType();
   }
 
   /**
-   * Get the lightweight-charts instance
+   * Get the lightweight-charts instance for full control
    * @returns {IChartApi|null}
    * @public
+   * @example
+   *   const chart = oakview.getChart();
+   *   const series = chart.addSeries(CandlestickSeries, { upColor: '#26a69a' });
+   *   series.setData(data);
    */
   getChart() {
     return this.chart;
@@ -308,9 +254,9 @@ class OakViewChart extends HTMLElement {
     }
 
     // Get data from target chart
-    const chartData = targetChart._data || targetChart._allData;
+    const chartData = targetChart._data;
     console.log('Chart data available:', chartData?.length || 0, 'bars');
-    console.log('_data:', targetChart._data?.length, '_allData:', targetChart._allData?.length);
+    console.log('_data:', targetChart._data?.length);
 
     if (!chartData || chartData.length === 0) {
       console.error('No data available for indicator calculation');
@@ -426,11 +372,6 @@ class OakViewChart extends HTMLElement {
     if (name === 'symbol') {
       const symbolBtn = this.shadowRoot.querySelector('.symbol-button');
       if (symbolBtn) symbolBtn.textContent = newValue || 'SYMBOL';
-    }
-
-    if (name === 'data-source' && newValue && this.chart) {
-      // Load data when data-source attribute changes
-      this.loadDataFromSource(newValue);
     }
   }
 
@@ -2311,7 +2252,7 @@ class OakViewChart extends HTMLElement {
       intervalMenu.querySelectorAll('.dropdown-item[data-interval]').forEach(item => {
         const interval = item.dataset.interval;
 
-        // Skip tick intervals (not relevant for CSV data)
+        // Skip tick intervals (most data providers don't support them)
         if (interval.endsWith('T')) {
           item.style.display = 'none';
           return;
@@ -2441,23 +2382,6 @@ class OakViewChart extends HTMLElement {
           }
           intervalBtn.textContent = buttonText;
 
-          // Update data points based on interval
-          const numInterval = parseInt(interval);
-          if (interval === '1D') {
-            this._currentDataPoints = 365;
-          } else if (interval === '1W') {
-            this._currentDataPoints = 520;
-          } else if (interval === '1M') {
-            this._currentDataPoints = 365;
-          } else if (numInterval >= 60) {
-            this._currentDataPoints = 180;
-          } else if (numInterval >= 15) {
-            this._currentDataPoints = 390;
-          } else {
-            this._currentDataPoints = 780;
-          }
-
-          this.updateDataSlice();
           intervalMenu.classList.remove('show');
 
           // Fetch data with new interval (with resampling if needed)
@@ -2466,7 +2390,6 @@ class OakViewChart extends HTMLElement {
             this._dataProvider.fetchHistorical(symbol, interval)
               .then(data => {
                 this._data = data;
-                this._allData = data;
                 this.updateChartType();
               })
               .catch(error => {
@@ -2832,7 +2755,7 @@ class OakViewChart extends HTMLElement {
         symbolList.innerHTML = symbols.map(item => {
           const isActive = currentSymbol === item.symbol;
           const name = item.description || item.name || item.symbol;
-          const exchange = item.primaryExchange || item.exchange || 'CSV';
+          const exchange = item.primaryExchange || item.exchange || '';
           return `
             <button class="symbol-item ${isActive ? 'active' : ''}" data-symbol="${item.symbol}">
               <div class="symbol-item-info">
@@ -3351,67 +3274,35 @@ class OakViewChart extends HTMLElement {
     return this.getAttribute('theme') || 'dark';
   }
 
+  /**
+   * Get the underlying lightweight-charts instance for full control
+   * @returns {IChartApi|null}
+   * @public
+   * @example
+   *   const chart = oakview.getChart();
+   *   const series = chart.addSeries(CandlestickSeries, { upColor: '#26a69a' });
+   *   series.setData(data);
+   */
   getChart() {
     return this.chart;
   }
 
+  /**
+   * Set data for the main series (controlled by chart type UI)
+   * This updates the current series based on the selected chart type.
+   * For advanced use cases, get the chart instance with getChart() and manage series directly.
+   * @param {Array} data - Array of OHLCV data
+   * @public
+   */
   setData(data) {
     this._data = data;
     this.updateChartType();
   }
 
-  addCandlestickSeries(data = [], options = {}) {
-    this._data = data;
-    this._currentChartType = 'candlestick';
-    this.updateChartType();
-    return this.currentSeries;
-  }
-
-  addLineSeries(data = [], options = {}) {
-    const candleData = data.map(d => ({
-      time: d.time,
-      open: d.value,
-      high: d.value,
-      low: d.value,
-      close: d.value
-    }));
-    this._data = candleData;
-    this._currentChartType = 'line';
-    this.updateChartType();
-    return this.currentSeries;
-  }
-
-  addAreaSeries(data = [], options = {}) {
-    const candleData = data.map(d => ({
-      time: d.time,
-      open: d.value,
-      high: d.value,
-      low: d.value,
-      close: d.value
-    }));
-    this._data = candleData;
-    this._currentChartType = 'area';
-    this.updateChartType();
-    return this.currentSeries;
-  }
-
-  addBarSeries(data = [], options = {}) {
-    this._data = data;
-    this._currentChartType = 'bar';
-    this.updateChartType();
-    return this.currentSeries;
-  }
-
-  addHistogramSeries(data = [], options = {}) {
-    const series = this.chart.addSeries(HistogramSeries, options);
-    if (data.length > 0) {
-      series.setData(data);
-    }
-    const id = `histogram-${this.series.size}`;
-    this.series.set(id, series);
-    return series;
-  }
-
+  /**
+   * Clear all indicator series (keeps the main price series)
+   * @public
+   */
   clearSeries() {
     this.series.forEach(series => {
       this.chart.removeSeries(series);

@@ -3,20 +3,21 @@
  *
  * A lightweight charting library based on TradingView's lightweight-charts v5
  * with built-in UI components and flexible data provider architecture.
+ *
+ * Main Entry Point: <oakview>
+ * - Full-featured chart layout with toolbar, multiple panes, and flexible configuration
+ * - Use this component for production applications
+ *
+ * For data loading, implement your own data provider by extending OakViewDataProvider
+ * (see examples/csv-example/providers/csv-provider.js for reference)
  */
 
-// Simple chart component (Web Component)
-export { default as OakViewChart } from './oakview-chart.js';
+// Main component - full layout with toolbar (ONLY ENTRY POINT)
+export { default as OakView } from './oakview-chart-layout.js';
+export { default as OakViewChartLayout } from './oakview-chart-layout.js'; // Alias for compatibility
 
-// Chart with UI/toolbar (Web Component)
-import OakViewChartUI from './oakview-chart-ui.js';
-export { OakViewChartUI };
-
-// Main component - full layout with toolbar
-export { default as OakViewChartLayout } from './oakview-chart-layout.js';
-
-// Data providers
-export { OakViewDataProvider, CSVDataProvider } from './data-providers/index.js';
+// Base data provider class for implementing custom providers
+export { OakViewDataProvider } from './data-providers/index.js';
 
 // Re-export lightweight-charts for advanced usage
 export { createChart, ColorType, LineStyle, CrosshairMode } from 'lightweight-charts';

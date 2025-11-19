@@ -1,18 +1,25 @@
 # OakView
 
-A lightweight, embeddable Web Component wrapper for [TradingView's Lightweight Charts](https://github.com/tradingview/lightweight-charts).
+A lightweight, embeddable Web Component for [TradingView's Lightweight Charts v5](https://github.com/tradingview/lightweight-charts) with built-in UI controls and flexible data provider architecture.
 
 ## Features
 
-- **Web Component**: Use as a standard HTML element `<oakview-chart>`
+- **Simple Tag**: `<oakview>` - Full-featured chart layout with toolbar and multiple panes
+- **UI Controls**: Built-in toolbar for chart type, timeframe, symbol search, and layout management
+- **Data Independent**: Bring your own data provider (CSV, WebSocket, REST API, etc.)
+- **Full Chart Access**: Direct access to lightweight-charts v5 API via `getChart()`
 - **Framework Agnostic**: Works with vanilla JS, React, Vue, Angular, or any framework
-- **Easy Integration**: Single script tag to include in any HTML page
-- **Full API Access**: Complete access to lightweight-charts functionality
 - **Responsive**: Automatically resizes with container
 - **Theme Support**: Built-in light/dark themes
-- **Multiple Chart Types**: Candlestick, Line, Area, Bar, Histogram
+- **Multiple Layouts**: Single, dual, triple, or quad pane layouts
 
 ## Quick Start
+
+### Installation
+
+```bash
+npm install oakview
+```
 
 ### Development
 
@@ -27,135 +34,278 @@ npm run dev
 npm run build
 ```
 
-### Usage in External HTML
+## Usage
 
-After building, include the script in your HTML:
+### Basic Example
 
 ```html
 <!DOCTYPE html>
 <html>
 <head>
-    <title>My Chart Page</title>
-    <script src="path/to/dist/oakview.umd.js"></script>
-</head>
-<body>
-    <!-- Use the custom element -->
-    <oakview-chart id="myChart" width="800" height="400" theme="dark"></oakview-chart>
-
-    <script>
-        const chart = document.getElementById('myChart');
-
-        // Wait for chart to initialize
+    <title>OakView Chart</title>
+    <script type="module">
+        import 'oakview';
+        
+        // Custom data provider
+        class MyDataProvider extends OakViewDataProvider {
+            async fetchHistorical(symbol, interval) {
+                const response = await fetch(`/api/data/${symbol}/${interval}`);
+                return response.json();
+            }
+        }
+        
+        // Initialize chart
+        const chart = document.getElementById('chart');
+        const provider = new MyDataProvider();
+        chart.setDataProvider(provider);
+        
+        // Listen for chart ready event
         chart.addEventListener('chart-ready', () => {
-            // Add candlestick data
-            chart.addCandlestickSeries([
-                { time: '2024-01-01', open: 100, high: 110, low: 95, close: 105 },
-                { time: '2024-01-02', open: 105, high: 115, low: 102, close: 112 }
-            ]);
-
-            chart.fitContent();
+            console.log('Chart is ready!');
         });
     </script>
+</head>
+<body>
+    <oakview 
+        id="chart" 
+        layout="single" 
+        symbol="SPX" 
+        theme="dark">
+    </oakview>
 </body>
 </html>
 ```
 
-## API Reference
+### Using the Chart API Directly
 
-### HTML Attributes
-
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `width` | number | container width | Chart width in pixels |
-| `height` | number | 400 | Chart height in pixels |
-| `theme` | 'light' \| 'dark' | 'dark' | Color theme |
-
-### JavaScript Methods
-
-#### `addCandlestickSeries(data, options)`
-Add a candlestick series to the chart.
+OakView provides UI controls but gives you **full access** to the underlying lightweight-charts instance:
 
 ```javascript
-chart.addCandlestickSeries([
-    { time: '2024-01-01', open: 100, high: 110, low: 95, close: 105 }
-], {
+// Get the chart
+const chart = document.getElementById('chart');
+
+// Get a specific pane's chart element
+const chartElement = chart.getChartAt(0);
+
+// Get the lightweight-charts instance for full control
+const chart = chartElement.getChart();
+
+// Now use the full lightweight-charts v5 API
+import { CandlestickSeries, LineSeries } from 'lightweight-charts';
+
+// Add a custom series
+const series = chart.addSeries(CandlestickSeries, {
     upColor: '#26a69a',
-    downColor: '#ef5350'
+    downColor: '#ef5350',
+    borderVisible: false,
+    wickUpColor: '#26a69a',
+    wickDownColor: '#ef5350'
 });
-```
 
-#### `addLineSeries(data, options)`
-Add a line series to the chart.
+// Set data on the series
+series.setData([
+    { time: 1672531200, open: 100, high: 110, low: 95, close: 105 },
+    { time: 1672617600, open: 105, high: 115, low: 102, close: 112 }
+]);
 
-```javascript
-chart.addLineSeries([
-    { time: '2024-01-01', value: 100 },
-    { time: '2024-01-02', value: 105 }
-], {
+// Add an indicator as a separate series
+const maLine = chart.addSeries(LineSeries, {
     color: '#2962ff',
     lineWidth: 2
 });
+maLine.setData([
+    { time: 1672531200, value: 102 },
+    { time: 1672617600, value: 108 }
+]);
+
+// Use any lightweight-charts API
+chart.timeScale().fitContent();
+chart.priceScale('right').applyOptions({ autoScale: true });
 ```
 
-#### `addAreaSeries(data, options)`
-Add an area series to the chart.
+### Using the Convenience API
+
+For simple use cases, use `setData()` which works with the UI controls:
 
 ```javascript
-chart.addAreaSeries([
-    { time: '2024-01-01', value: 100 }
-], {
-    topColor: 'rgba(41, 98, 255, 0.4)',
-    bottomColor: 'rgba(41, 98, 255, 0.0)',
-    lineColor: 'rgba(41, 98, 255, 1)'
+const chartElement = chart.getChartAt(0);
+
+// Set data - will update based on selected chart type from toolbar
+chartElement.setData([
+    { time: 1672531200, open: 100, high: 110, low: 95, close: 105 },
+    { time: 1672617600, open: 105, high: 115, low: 102, close: 112 }
+]);
+
+// User can change chart type via toolbar, and data automatically updates
+```
+
+## Data Providers
+
+OakView is **data-independent**. Implement your own data provider by extending `OakViewDataProvider`:
+
+```javascript
+import { OakViewDataProvider } from 'oakview';
+
+class MyDataProvider extends OakViewDataProvider {
+    /**
+     * Initialize the provider
+     */
+    async initialize(config) {
+        // Setup connections, authenticate, etc.
+    }
+
+    /**
+     * Fetch historical data
+     * @param {string} symbol - Symbol to fetch
+     * @param {string} interval - Time interval (1m, 5m, 1h, 1D, etc.)
+     * @returns {Promise<Array>} Array of OHLCV bars
+     */
+    async fetchHistorical(symbol, interval) {
+        // Return array of { time, open, high, low, close, volume }
+        return [
+            { time: 1672531200, open: 100, high: 110, low: 95, close: 105 }
+        ];
+    }
+
+    /**
+     * Search for symbols (optional)
+     * @param {string} query - Search query
+     * @returns {Promise<Array>} Array of symbol objects
+     */
+    async searchSymbols(query) {
+        return [
+            { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' }
+        ];
+    }
+
+    /**
+     * Disconnect and cleanup
+     */
+    disconnect() {
+        // Close connections, clear cache, etc.
+    }
+}
+```
+
+### Example: CSV Data Provider
+
+See `examples/csv-example/` for a complete implementation:
+
+```javascript
+import CSVDataProvider from './providers/csv-provider.js';
+
+const provider = new CSVDataProvider({
+    baseUrl: './data/',
+    availableFiles: ['SPX_1D.csv', 'QQQ_60.csv']
+});
+
+await provider.initialize();
+chart.setDataProvider(provider);
+```
+
+## API Reference
+
+### `<oakview>`
+
+Main component with toolbar and multiple pane support.
+
+#### HTML Attributes
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `layout` | 'single' \| 'dual' \| 'triple' \| 'quad' | 'single' | Pane layout |
+| `symbol` | string | 'SYMBOL' | Initial symbol |
+| `theme` | 'light' \| 'dark' | 'dark' | Color theme |
+
+#### Methods
+
+##### `setDataProvider(provider)`
+Set the data provider for all charts.
+
+```javascript
+chart.setDataProvider(new MyDataProvider());
+```
+
+##### `getChartAt(index)`
+Get a specific pane's chart element.
+
+```javascript
+const chartElement = chart.getChartAt(0);
+```
+
+##### `getChartCount()`
+Get the number of chart panes.
+
+```javascript
+const count = chart.getChartCount(); // 1, 2, 3, or 4
+```
+
+##### `setLayout(layout)`
+Change the pane layout.
+
+```javascript
+chart.setLayout('dual'); // 'single', 'dual', 'triple', 'quad'
+```
+
+#### Events
+
+##### `symbol-change`
+Fired when symbol is changed via toolbar.
+
+```javascript
+chart.addEventListener('symbol-change', (e) => {
+    console.log('Symbol:', e.detail.symbol);
 });
 ```
 
-#### `addBarSeries(data, options)`
-Add a bar series to the chart.
+##### `interval-change`
+Fired when interval is changed via toolbar.
 
 ```javascript
-chart.addBarSeries([
-    { time: '2024-01-01', open: 100, high: 110, low: 95, close: 105 }
+chart.addEventListener('interval-change', (e) => {
+    console.log('Interval:', e.detail.interval);
+});
+```
+
+##### `layout-change`
+Fired when layout is changed.
+
+```javascript
+chart.addEventListener('layout-change', (e) => {
+    console.log('Layout:', e.detail.layout);
+});
+```
+
+### Chart Element (Pane)
+
+Individual chart within a layout.
+
+#### Methods
+
+##### `getChart()`
+Get the lightweight-charts instance for **full API control**.
+
+```javascript
+const chart = chartElement.getChart();
+// Use any lightweight-charts v5 API
+const series = chart.addSeries(CandlestickSeries, options);
+series.setData(data);
+```
+
+##### `setData(data)`
+Set data for the main series (works with UI chart type selector).
+
+```javascript
+chartElement.setData([
+    { time: 1672531200, open: 100, high: 110, low: 95, close: 105 }
 ]);
 ```
 
-#### `addHistogramSeries(data, options)`
-Add a histogram series to the chart.
-
-```javascript
-chart.addHistogramSeries([
-    { time: '2024-01-01', value: 1000000, color: 'rgba(38, 166, 154, 0.5)' }
-]);
-```
-
-#### `clearSeries()`
-Remove all series from the chart.
-
-```javascript
-chart.clearSeries();
-```
-
-#### `fitContent()`
-Fit the chart content to the viewport.
-
-```javascript
-chart.fitContent();
-```
-
-#### `getChart()`
-Get the underlying lightweight-charts instance for advanced usage.
-
-```javascript
-const lwChart = chart.getChart();
-// Use any lightweight-charts API
-lwChart.timeScale().scrollToPosition(5);
-```
-
-#### `applyOptions(options)`
+##### `applyOptions(options)`
 Apply chart options.
 
 ```javascript
-chart.applyOptions({
+chartElement.applyOptions({
     layout: {
         background: { color: '#000000' },
         textColor: '#ffffff'
@@ -163,24 +313,38 @@ chart.applyOptions({
 });
 ```
 
-### Events
-
-#### `chart-ready`
-Fired when the chart is initialized and ready to use.
+##### `fitContent()`
+Fit chart content to viewport.
 
 ```javascript
-chart.addEventListener('chart-ready', (event) => {
-    console.log('Chart ready!', event.detail.chart);
-});
+chartElement.fitContent();
 ```
 
 ## Examples
 
-See the following files for complete examples:
+### CSV Example
+Complete working example with CSV data loading:
 
-- `example/demo.html` - Interactive demo with S&P 500 data from CSV
-- `example-external.html` - External usage example with stock/crypto data
-- `example/SP_SPX, 1D.csv` - Historical S&P 500 data for testing
+```bash
+cd examples/csv-example
+npm install
+npm run dev
+```
+
+Features:
+- CSV file loading with PapaParse
+- Multiple symbols and timeframes
+- Symbol search
+- Data resampling for higher timeframes
+
+### WebSocket Example
+Real-time data streaming example:
+
+```bash
+cd examples/websocket-example
+npm install
+npm run dev
+```
 
 ## Architecture
 
@@ -189,26 +353,42 @@ See the following files for complete examples:
 ```
 oakview/
 ├── src/
-│   ├── oakview-chart.js     # Web Component implementation
-│   └── csv-loader.js        # CSV data loader utility
-├── example/
-│   ├── demo.html            # Interactive demo
-│   └── SP_SPX, 1D.csv      # Sample S&P 500 data
-├── dist/                     # Built files (after npm run build)
-│   ├── oakview.es.js        # ES module
-│   └── oakview.umd.js       # UMD bundle (for <script> tags)
-├── index.html               # Landing page
-├── example-external.html    # External usage example
-├── vite.config.js           # Build configuration
+│   ├── index.js                      # Main entry point
+│   ├── oakview-chart-layout.js       # Layout component
+│   ├── oakview-chart-ui.js           # Chart with UI
+│   ├── oakview-chart.js              # Base chart component
+│   └── data-providers/
+│       ├── base.js                   # Base data provider class
+│       └── index.js                  # Exports
+├── examples/
+│   ├── csv-example/                  # CSV data provider example
+│   │   ├── providers/
+│   │   │   └── csv-provider.js       # CSV implementation
+│   │   ├── data/
+│   │   │   ├── SPX_1D.csv
+│   │   │   └── QQQ_60.csv
+│   │   └── index.html
+│   └── websocket-example/            # WebSocket example
+├── dist/                              # Built files
+│   ├── oakview.es.js                 # ES module
+│   └── oakview.umd.js                # UMD bundle
 └── package.json
 ```
 
 ### Technology Stack
 
-- **Lightweight Charts**: Core charting library from TradingView
+- **Lightweight Charts v5**: Core charting library from TradingView
 - **Web Components**: Standard browser API for custom elements
 - **Vite**: Modern build tool for bundling
 - **Shadow DOM**: Encapsulation for styles and markup
+
+## Design Principles
+
+1. **Data Independence**: No built-in data loading - bring your own provider
+2. **Full Control**: Direct access to lightweight-charts API via `getChart()`
+3. **UI Convenience**: Built-in toolbar for common operations
+4. **No Wrappers**: Don't duplicate lightweight-charts API - expose it directly
+5. **Single Entry Point**: Use `<oakview>` for all applications
 
 ## Browser Support
 
@@ -219,6 +399,32 @@ OakView uses modern Web Components APIs and requires:
 - Safari 13.1+
 
 For older browsers, you may need polyfills.
+
+## Migration from v1.x
+
+If you were using the old API:
+
+**Old (v1.x)**:
+```javascript
+chart.addCandlestickSeries(data, options);
+chart.addLineSeries(data, options);
+```
+
+**New (v2.x)**:
+```javascript
+// Get the chart instance first
+const lwChart = chart.getChart();
+
+// Use lightweight-charts v5 API directly
+import { CandlestickSeries, LineSeries } from 'lightweight-charts';
+const series = lwChart.addSeries(CandlestickSeries, options);
+series.setData(data);
+```
+
+Or use the convenience method:
+```javascript
+chart.setData(data); // Works with UI chart type selector
+```
 
 ## License
 

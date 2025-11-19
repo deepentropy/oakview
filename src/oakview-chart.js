@@ -175,7 +175,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addCandlestickSeries(data = [], options = {}) {
-    const series = this._chart.addSeries('Candlestick', options);
+    const series = this._chart.addCandlestickSeries(options);
     if (data.length > 0) {
       series.setData(data);
     }
@@ -191,7 +191,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addLineSeries(data = [], options = {}) {
-    const series = this._chart.addSeries('Line', options);
+    const series = this._chart.addLineSeries(options);
     if (data.length > 0) {
       series.setData(data);
     }
@@ -207,7 +207,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addAreaSeries(data = [], options = {}) {
-    const series = this._chart.addSeries('Area', options);
+    const series = this._chart.addAreaSeries(options);
     if (data.length > 0) {
       series.setData(data);
     }
@@ -223,7 +223,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addBarSeries(data = [], options = {}) {
-    const series = this._chart.addSeries('Bar', options);
+    const series = this._chart.addBarSeries(options);
     if (data.length > 0) {
       series.setData(data);
     }
@@ -239,7 +239,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addHistogramSeries(data = [], options = {}) {
-    const series = this._chart.addSeries('Histogram', options);
+    const series = this._chart.addHistogramSeries(options);
     if (data.length > 0) {
       series.setData(data);
     }
@@ -278,7 +278,9 @@ class OakViewChart extends HTMLElement {
   }
 }
 
-// Register the custom element
-customElements.define('oakview-chart', OakViewChart);
+// Register the custom element only if not already defined
+if (!customElements.get('oakview-chart')) {
+  customElements.define('oakview-chart', OakViewChart);
+}
 
 export default OakViewChart;

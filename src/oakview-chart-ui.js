@@ -3437,6 +3437,9 @@ class OakViewChart extends HTMLElement {
   }
 }
 
-customElements.define('oakview-chart', OakViewChart);
+// Register the custom element only if not already defined
+if (!customElements.get('oakview-chart')) {
+  customElements.define('oakview-chart', OakViewChart);
+}
 
 export default OakViewChart;

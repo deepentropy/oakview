@@ -813,7 +813,9 @@ class OakViewChartLayout extends HTMLElement {
   }
 }
 
-// Register the custom element
-customElements.define('oakview-chart-layout', OakViewChartLayout);
+// Register the custom element only if not already defined
+if (!customElements.get('oakview-chart-layout')) {
+  customElements.define('oakview-chart-layout', OakViewChartLayout);
+}
 
 export default OakViewChartLayout;

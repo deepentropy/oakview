@@ -8,6 +8,10 @@
 // Simple chart component (Web Component)
 export { default as OakViewChart } from './oakview-chart.js';
 
+// Chart with UI/toolbar (Web Component)
+import OakViewChartUI from './oakview-chart-ui.js';
+export { OakViewChartUI };
+
 // Main component - full layout with toolbar
 export { default as OakViewChartLayout } from './oakview-chart-layout.js';
 

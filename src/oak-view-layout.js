@@ -1,5 +1,5 @@
 import { createChart } from 'lightweight-charts';
-import './oakview-chart-ui.js';    // Chart with toolbar
+import './oak-view-chart.js';    // Individual chart component
 import cssVariables from './oakview-variables.css?inline';
 
 /**
@@ -301,7 +301,7 @@ class OakViewChartLayout extends HTMLElement {
     toolbarContainer.className = 'toolbar-container';
 
     // Create a single chart with toolbar for controls (no data loading)
-    const controlChart = document.createElement('oakview-chart');
+    const controlChart = document.createElement('oakview-internal-chart');
     controlChart.className = 'control-chart';
     controlChart.setAttribute('theme', this.getAttribute('theme') || 'dark');
     controlChart.setAttribute('show-toolbar', 'true');
@@ -381,7 +381,7 @@ class OakViewChartLayout extends HTMLElement {
       const settings = this._paneSettings.get(paneId);
 
       // Create chart element WITHOUT toolbar
-      const chart = document.createElement('oakview-chart');
+      const chart = document.createElement('oakview-internal-chart');
       chart.className = 'pane-chart';
       chart.setAttribute('theme', this.getAttribute('theme') || 'dark');
       chart.setAttribute('show-toolbar', 'false');
@@ -626,7 +626,7 @@ class OakViewChartLayout extends HTMLElement {
   /**
    * Get the chart element at the specified pane index
    * @param {number} index - Pane index (0-based)
-   * @returns {HTMLElement} The oakview-chart element
+   * @returns {HTMLElement} The internal chart element
    */
   getChartAt(index) {
     if (index < 0 || index >= this._panes.length) return null;
@@ -635,7 +635,7 @@ class OakViewChartLayout extends HTMLElement {
 
   /**
    * Get all chart elements
-   * @returns {Array<HTMLElement>} Array of oakview-chart elements
+   * @returns {Array<HTMLElement>} Array of internal chart elements
    */
   getAllCharts() {
     return this._panes.map(pane => pane.chart);

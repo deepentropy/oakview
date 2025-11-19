@@ -3329,9 +3329,10 @@ class OakViewChart extends HTMLElement {
   }
 }
 
-// Register the custom element only if not already defined
-if (!customElements.get('oakview-chart')) {
-  customElements.define('oakview-chart', OakViewChart);
+// Register the custom element with an internal name (not for external use)
+if (!customElements.get('oakview-internal-chart')) {
+  customElements.define('oakview-internal-chart', OakViewChart);
 }
 
-export default OakViewChart;
+// DO NOT export - this is an internal component only used by <oak-view>
+// External users should never import or use this class directly

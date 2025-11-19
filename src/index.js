@@ -13,8 +13,8 @@
  */
 
 // Main component - full layout with toolbar (ONLY ENTRY POINT)
-export { default as OakView } from './oakview-chart-layout.js';
-export { default as OakViewChartLayout } from './oakview-chart-layout.js'; // Alias for compatibility
+export { default as OakView } from './oak-view-layout.js';
+export { default as OakViewChartLayout } from './oak-view-layout.js'; // Alias for compatibility
 
 // Base data provider class for implementing custom providers
 export { OakViewDataProvider } from './data-providers/index.js';

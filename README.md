@@ -344,13 +344,13 @@ Features:
 ```
 oakview/
 ├── src/
-│   ├── index.js                      # Main entry point
-│   ├── oakview-chart-layout.js       # Layout component (<oak-view>)
-│   ├── oakview-chart-ui.js           # Chart with UI (<oakview-chart>)
+│   ├── index.js                      # Main entry point (exports only public API)
+│   ├── oak-view-layout.js            # <oak-view> component (PUBLIC)
+│   ├── oak-view-chart.js             # Internal chart component (PRIVATE - do not use)
 │   ├── oakview-variables.css         # CSS variables
 │   └── data-providers/
 │       ├── index.js
-│       └── base.js                   # OakViewDataProvider base class
+│       └── base.js                   # OakViewDataProvider base class (PUBLIC)
 ├── examples/
 │   └── csv-example/                  # CSV data provider example
 │       ├── index.html
@@ -380,7 +380,7 @@ oakview/
 4. **No Wrappers**: Don't duplicate lightweight-charts API - expose it directly
 5. **Single Entry Point**: Use `<oak-view>` for all applications - it's the only public component
 
-**Note**: `<oak-view>` internally uses `<oakview-chart>` elements for individual panes, but you should **never** use `<oakview-chart>` directly. Always use `<oak-view>` which manages the layout, toolbar, and multiple chart panes.
+**Note**: Internally, `<oak-view>` uses a private `<oakview-internal-chart>` element for each chart pane. This internal component is **not exposed** and should **never** be used directly. Always use `<oak-view>` which manages everything automatically.
 
 ## Browser Support
 

@@ -175,7 +175,8 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addCandlestickSeries(data = [], options = {}) {
-    const series = this._chart.addCandlestickSeries(options);
+    // In lightweight-charts v5, use chart.addSeries with type
+    const series = this._chart.addSeries({ type: 'Candlestick', ...options });
     if (data.length > 0) {
       series.setData(data);
     }
@@ -191,7 +192,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addLineSeries(data = [], options = {}) {
-    const series = this._chart.addLineSeries(options);
+    const series = this._chart.addSeries({ type: 'Line', ...options });
     if (data.length > 0) {
       series.setData(data);
     }
@@ -207,7 +208,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addAreaSeries(data = [], options = {}) {
-    const series = this._chart.addAreaSeries(options);
+    const series = this._chart.addSeries({ type: 'Area', ...options });
     if (data.length > 0) {
       series.setData(data);
     }
@@ -223,7 +224,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addBarSeries(data = [], options = {}) {
-    const series = this._chart.addBarSeries(options);
+    const series = this._chart.addSeries({ type: 'Bar', ...options });
     if (data.length > 0) {
       series.setData(data);
     }
@@ -239,7 +240,7 @@ class OakViewChart extends HTMLElement {
    * @returns {Object} The created series
    */
   addHistogramSeries(data = [], options = {}) {
-    const series = this._chart.addHistogramSeries(options);
+    const series = this._chart.addSeries({ type: 'Histogram', ...options });
     if (data.length > 0) {
       series.setData(data);
     }

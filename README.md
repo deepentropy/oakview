@@ -4,7 +4,7 @@ A lightweight, embeddable Web Component for [TradingView's Lightweight Charts v5
 
 ## Features
 
-- **Simple Tag**: `<oakview>` - Full-featured chart layout with toolbar and multiple panes
+- **Simple Tag**: `<oak-view>` - Full-featured chart layout with toolbar and multiple panes
 - **UI Controls**: Built-in toolbar for chart type, timeframe, symbol search, and layout management
 - **Data Independent**: Bring your own data provider (CSV, WebSocket, REST API, etc.)
 - **Full Chart Access**: Direct access to lightweight-charts v5 API via `getChart()`
@@ -66,12 +66,12 @@ npm run build
     </script>
 </head>
 <body>
-    <oakview 
+    <oak-view 
         id="chart" 
         layout="single" 
         symbol="SPX" 
         theme="dark">
-    </oakview>
+    </oak-view>
 </body>
 </html>
 ```
@@ -205,7 +205,7 @@ chart.setDataProvider(provider);
 
 ## API Reference
 
-### `<oakview>`
+### `<oak-view>`
 
 Main component with toolbar and multiple pane support.
 
@@ -323,6 +323,7 @@ chartElement.fitContent();
 ## Examples
 
 ### CSV Example
+
 Complete working example with CSV data loading:
 
 ```bash
@@ -335,16 +336,6 @@ Features:
 - CSV file loading with PapaParse
 - Multiple symbols and timeframes
 - Symbol search
-- Data resampling for higher timeframes
-
-### WebSocket Example
-Real-time data streaming example:
-
-```bash
-cd examples/websocket-example
-npm install
-npm run dev
-```
 
 ## Architecture
 
@@ -354,22 +345,21 @@ npm run dev
 oakview/
 ├── src/
 │   ├── index.js                      # Main entry point
-│   ├── oakview-chart-layout.js       # Layout component
-│   ├── oakview-chart-ui.js           # Chart with UI
-│   ├── oakview-chart.js              # Base chart component
+│   ├── oakview-chart-layout.js       # Layout component (<oak-view>)
+│   ├── oakview-chart-ui.js           # Chart with UI (<oakview-chart>)
+│   ├── oakview-variables.css         # CSS variables
 │   └── data-providers/
-│       ├── base.js                   # Base data provider class
-│       └── index.js                  # Exports
+│       ├── index.js
+│       └── base.js                   # OakViewDataProvider base class
 ├── examples/
-│   ├── csv-example/                  # CSV data provider example
-│   │   ├── providers/
-│   │   │   └── csv-provider.js       # CSV implementation
-│   │   ├── data/
-│   │   │   ├── SPX_1D.csv
-│   │   │   └── QQQ_60.csv
-│   │   └── index.html
-│   └── websocket-example/            # WebSocket example
-├── dist/                              # Built files
+│   └── csv-example/                  # CSV data provider example
+│       ├── index.html
+│       ├── providers/
+│       │   └── csv-provider.js       # Multi-file CSV provider
+│       └── data/
+│           ├── SPX_1D.csv
+│           └── QQQ_60.csv
+├── dist/
 │   ├── oakview.es.js                 # ES module
 │   └── oakview.umd.js                # UMD bundle
 └── package.json

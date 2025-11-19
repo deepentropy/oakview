@@ -21,23 +21,43 @@ Load and display historical market data from CSV files. Perfect for:
 
 [View CSV Example Documentation →](./csv-example/README.md)
 
-### 2. WebSocket Example
+### 2. WebSocket Example (Generic Template)
 **Path:** `examples/websocket-example/`
 
-Real-time streaming market data via WebSocket connections. Ideal for:
-- Live trading applications
-- Real-time market monitoring
-- Dynamic data updates
-- Production applications
+Generic template for integrating real-time WebSocket data. Ideal for:
+- Custom WebSocket integrations
+- Learning how to build providers
+- Adapting to your own backend
+- Testing and development
 
 **Features:**
-- Real-time data streaming
-- Historical data loading
-- Automatic reconnection
+- Real-time data streaming template
+- Mock provider for testing
+- Automatic reconnection example
 - Bar aggregation from ticks
 - Multiple symbol support
 
 [View WebSocket Example Documentation →](./websocket-example/README.md)
+
+### 3. VoltTrading Integration (Production Example)
+**Path:** `examples/volttrading-integration/`
+
+Production-ready integration with VoltTrading backend. Best for:
+- VoltTrading platform users
+- Production trading applications
+- Complete reference implementation
+- Multi-pane layouts with state management
+
+**Features:**
+- Complete VoltTrading provider
+- Historical data via REST API
+- Real-time quotes via WebSocket
+- Client-side bar aggregation (33 timeframes)
+- Reference-counted subscriptions
+- Symbol search integration
+- Multi-pane configuration persistence
+
+[View VoltTrading Integration Documentation →](./volttrading-integration/README.md)
 
 ## Quick Start
 
@@ -61,34 +81,63 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+### VoltTrading Integration
+
+```bash
+cd examples/volttrading-integration
+npm install
+npm run dev
+```
+
+Then open http://localhost:5173 in your browser.
+
+> **Note:** Requires VoltTrading backend running on http://localhost:8000
+
 ## Project Structure
 
 ```
 examples/
-├── README.md                    # This file
-├── csv-example/                 # Static CSV data example
-│   ├── README.md               # Detailed documentation
-│   ├── index.html              # Demo page
-│   ├── package.json            # Dependencies
-│   └── data/                   # Sample CSV files
-│       ├── SPX_1D.csv
-│       └── AAPL_1D.csv
+├── README.md                              # This file
 │
-└── websocket-example/           # Real-time WebSocket example
-    ├── README.md               # Detailed documentation
-    ├── index.html              # Demo page
-    ├── package.json            # Dependencies
-    └── providers/              # Custom provider implementations
-        └── custom-websocket-provider.js
+├── csv-example/                           # Static CSV data example
+│   ├── README.md                         # Detailed documentation
+│   ├── index.html                        # Demo page
+│   ├── package.json                      # Dependencies
+│   ├── providers/                        # Custom provider
+│   │   └── csv-provider.js              # CSV data provider implementation
+│   └── data/                             # Sample CSV files
+│       ├── SPX_1D.csv
+│       └── QQQ_60.csv
+│
+├── websocket-example/                     # Generic WebSocket template
+│   ├── README.md                         # Detailed documentation
+│   ├── index.html                        # Demo page with mock provider
+│   ├── package.json                      # Dependencies
+│   └── providers/                        # Custom provider templates
+│       └── custom-websocket-provider.js  # Generic WebSocket template
+│
+└── volttrading-integration/               # Production VoltTrading integration
+    ├── README.md                         # Detailed documentation
+    ├── index.html                        # Production demo
+    ├── package.json                      # Dependencies
+    └── volttrading-provider.js           # Complete VoltTrading provider
 ```
 
 ## Data Providers
 
-OakView uses a flexible data provider system based on the `OakViewDataProvider` interface located in `src/data-providers/base.js`.
+OakView uses a flexible data provider system based on the `OakViewDataProvider` interface.
+
+### Using the Data Provider
+
+All examples now use the built distribution for imports:
+
+```javascript
+import { OakViewDataProvider } from '../../dist/oakview.es.js';
+```
 
 ### Base Provider Interface
 
-**Base Provider** (`src/data-providers/base.js`)
+**Base Provider** (`dist/oakview.es.js` exports `OakViewDataProvider`)
 - Abstract base class that defines the provider interface
 - Part of the core OakView library
 - All custom providers must extend this class
@@ -98,97 +147,91 @@ OakView uses a flexible data provider system based on the `OakViewDataProvider` 
 The examples folder contains reference implementations you can use as templates:
 
 **CSV Provider** (`examples/csv-example/providers/csv-provider.js`)
-- Example implementation for loading data from CSV files
-- Supports various CSV formats
-- Client-side only, no server needed
-- Great starting point for custom static data providers
+- Loads static historical data from CSV files
+- Simple file-based storage
+- Good for demos and backtesting
 
-**VoltTrading Provider** (`examples/websocket-example/providers/volttrading-provider.js`)
-- Example integration with VoltTrading services
-- Real-time WebSocket streaming
-- Historical data via REST API
-- Reference for building WebSocket-based providers
+**Custom WebSocket Provider** (`examples/websocket-example/providers/custom-websocket-provider.js`)
+- Generic template for WebSocket integration
+- Mock data for testing
+- Customize for your backend
 
-### Creating Custom Providers
+**VoltTrading Provider** (`examples/volttrading-integration/volttrading-provider.js`)
+- Production-ready VoltTrading integration
+- REST API for historical data
+- WebSocket for real-time quotes
+- Client-side bar aggregation for 33 timeframes
+- Reference-counted subscription management
 
-To create your own data provider:
+## Creating Your Own Provider
 
-1. Extend the `OakViewDataProvider` base class from `src/data-providers/base.js`
-2. Implement required methods:
-   - `initialize(config)` - Setup and connection
-   - `fetchHistorical(symbol, interval, from, to)` - Load historical data
-   - `subscribe(symbol, interval, callback)` - Real-time updates (optional)
-   - `disconnect()` - Cleanup (optional)
-
-Example:
+To create a custom provider, extend the base class:
 
 ```javascript
-import OakViewDataProvider from '../path/to/oakview/src/data-providers/base.js';
+import { OakViewDataProvider } from 'oakview/dist/oakview.es.js';
 
 class MyCustomProvider extends OakViewDataProvider {
   async initialize(config) {
-    // Setup your connection
+    // Setup connection to your data source
   }
 
   async fetchHistorical(symbol, interval, from, to) {
-    // Fetch and return historical data
-    return [
-      { time: 1704067200, open: 100, high: 102, low: 99, close: 101, volume: 1000000 },
-      // ... more bars
-    ];
+    // Return array of { time, open, high, low, close, volume }
   }
 
   subscribe(symbol, interval, callback) {
     // Setup real-time subscription
     // Call callback(bar) when new data arrives
-    return () => {
-      // Cleanup function
-    };
+    // Return unsubscribe function
+  }
+
+  async searchSymbols(query) {
+    // Return array of matching symbols
   }
 
   disconnect() {
     // Cleanup resources
   }
 }
-
-export default MyCustomProvider;
 ```
 
-## Integration Guide
+## Using OakView in Your App
 
-### Step 1: Install OakView
+### Installation
 
-For development (from local source):
-```bash
-# In your project
-npm install ../path/to/oakview
-```
-
-For production (once published):
 ```bash
 npm install oakview
 ```
 
-### Step 2: Import Components
+### Basic Usage
 
-```javascript
-import 'oakview/oakview-chart-layout.js';
-import OakViewDataProvider from 'oakview/src/data-providers/base.js';
-// Then use your custom provider that extends OakViewDataProvider
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Trading App</title>
+</head>
+<body>
+  <oak-view id="chart" theme="dark" symbol="AAPL"></oak-view>
+
+  <script type="module">
+    import 'oakview/dist/oakview.es.js';
+    import { OakViewDataProvider } from 'oakview/dist/oakview.es.js';
+    
+    // Create your custom provider
+    class MyProvider extends OakViewDataProvider {
+      // ... implement required methods
+    }
+    
+    // Initialize
+    const chart = document.getElementById('chart');
+    const provider = new MyProvider();
+    await provider.initialize();
+    chart.setDataProvider(provider);
+  </script>
+</body>
+</html>
 ```
-
-### Step 3: Create Provider
-
-```javascript
-const provider = new CSVDataProvider({
-  baseUrl: './data/',
-  filePattern: (symbol, interval) => `${symbol}_${interval}.csv`
-});
-
-await provider.initialize();
-```
-
-### Step 4: Setup Chart
 
 ```html
 <oakview-chart-layout

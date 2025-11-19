@@ -8,11 +8,21 @@
   "exports": {
     ".": {
       "import": "./dist/oakview.es.js",
-      "require": "./dist/oakview.umd.js"
+      "require": "./dist/oakview.umd.js",
+      "types": "./src/data-providers/types.d.ts"
+    },
+    "./dist/*": "./dist/*",
+    "./validator": {
+      "import": "./src/data-providers/validator.js",
+      "types": "./src/data-providers/types.d.ts"
     }
   },
+  "types": "./src/data-providers/types.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src/data-providers/types.d.ts",
+    "src/data-providers/validator.js",
+    "docs"
   ],
   "scripts": {
     "dev": "vite",

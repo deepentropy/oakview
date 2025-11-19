@@ -1,4 +1,4 @@
-import OakViewDataProvider from '../../../src/data-providers/base.js';
+import { OakViewDataProvider } from '../../../dist/oakview.es.js';
 
 /**
  * Custom WebSocket Data Provider Template

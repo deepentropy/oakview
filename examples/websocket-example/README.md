@@ -1,6 +1,8 @@
 # OakView WebSocket Example
 
-This example demonstrates how to integrate OakView with real-time WebSocket data streams in your project.
+This example demonstrates how to integrate OakView with real-time WebSocket data streams using a **generic custom provider**.
+
+> **Note:** For a production-ready VoltTrading integration, see the [volttrading-integration](../volttrading-integration/) example instead.
 
 ## Features
 
@@ -10,6 +12,7 @@ This example demonstrates how to integrate OakView with real-time WebSocket data
 - Multiple symbol support
 - Symbol search integration
 - Automatic reconnection handling
+- Generic template for any WebSocket provider
 
 ## Prerequisites
 
@@ -51,7 +54,7 @@ npm run dev
 To integrate your WebSocket service, extend the `OakViewDataProvider` base class from the core library:
 
 ```javascript
-import OakViewDataProvider from '../../src/data-providers/base.js';
+import { OakViewDataProvider } from '../../dist/oakview.es.js';
 
 class CustomWebSocketProvider extends OakViewDataProvider {
   constructor(config) {
@@ -163,7 +166,7 @@ export default CustomWebSocketProvider;
 ### Step 1: Import OakView and Your Provider
 
 ```javascript
-import '../../src/oakview-chart-layout.js';
+import '../../dist/oakview.es.js';
 import CustomWebSocketProvider from './providers/custom-websocket-provider.js';
 ```
 
@@ -192,12 +195,12 @@ try {
 ### Step 4: Add the Chart Component
 
 ```html
-<oakview-chart-layout
+<oak-view
   id="chart"
   symbol="AAPL"
   interval="1D"
   theme="dark">
-</oakview-chart-layout>
+</oak-view>
 ```
 
 ### Step 5: Connect the Provider
@@ -622,10 +625,10 @@ testProvider();
 
 ## VoltTrading Provider Example
 
-If you're using VoltTrading, you can use the included example provider as a starting point:
+If you're using VoltTrading, see the dedicated [volttrading-integration](../volttrading-integration/) example which provides a complete, production-ready implementation.
 
 ```javascript
-import VoltTradingProvider from './providers/volttrading-provider.js';
+import VoltTradingProvider from '../volttrading-integration/volttrading-provider.js';
 import { VoltTradingWSService, VoltTradingAPIService } from 'volttrading-sdk';
 
 const wsService = new VoltTradingWSService({

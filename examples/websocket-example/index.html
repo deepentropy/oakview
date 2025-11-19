@@ -291,22 +291,22 @@
       <div><span class="label">Last Update:</span> <span class="value" id="statLastUpdate">-</span></div>
     </div>
 
-    <oakview-chart-layout
+    <oak-view
       id="chart"
       layout="single"
       theme="dark">
-    </oakview-chart-layout>
+    </oak-view>
   </div>
 
   <script type="module">
     // Import OakView components
-    import '../../src/oakview-chart-layout.js';
+    import '../../dist/oakview.es.js';
 
     // Import custom WebSocket provider (you'll need to implement this)
     // import CustomWebSocketProvider from './providers/custom-websocket-provider.js';
 
     // For this demo, we'll create a mock provider that simulates WebSocket behavior
-    import OakViewDataProvider from '../../src/data-providers/base.js';
+    import { OakViewDataProvider } from '../../dist/oakview.es.js';
 
     // Mock WebSocket Provider (replace with your actual provider)
     class MockWebSocketProvider extends OakViewDataProvider {

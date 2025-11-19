@@ -1,4 +1,4 @@
-import { OakViewDataProvider } from '../../src/data-providers/index.js';
+import { OakViewDataProvider } from '../../dist/oakview.es.js';
 
 /**
  * VoltTrading Data Provider - Production Version

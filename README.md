@@ -141,42 +141,62 @@ chartElement.setData([
 
 ## Data Providers
 
-OakView is **data-independent**. Implement your own data provider by extending `OakViewDataProvider`:
+OakView uses a flexible data provider system to fetch and stream market data. You implement a provider by extending the `OakViewDataProvider` base class.
+
+### 📚 Documentation
+
+- **[Quick Reference](./docs/DATA_PROVIDER_QUICKREF.md)** - One-page getting started guide
+- **[Complete Guide](./docs/DATA_PROVIDER_GUIDE.md)** - Full documentation with examples and patterns
+- **[Examples Directory](./examples/)** - Working implementations (CSV, WebSocket, VoltTrading)
+
+### Minimal Implementation
 
 ```javascript
 import { OakViewDataProvider } from 'oakview';
 
-class MyDataProvider extends OakViewDataProvider {
-    /**
-     * Initialize the provider
-     */
-    async initialize(config) {
-        // Setup connections, authenticate, etc.
-    }
+class MyProvider extends OakViewDataProvider {
+  async initialize(config) {
+    this.apiKey = config.apiKey;
+  }
 
-    /**
-     * Fetch historical data
-     * @param {string} symbol - Symbol to fetch
-     * @param {string} interval - Time interval (1m, 5m, 1h, 1D, etc.)
-     * @returns {Promise<Array>} Array of OHLCV bars
-     */
-    async fetchHistorical(symbol, interval) {
-        // Return array of { time, open, high, low, close, volume }
-        return [
-            { time: 1672531200, open: 100, high: 110, low: 95, close: 105 }
-        ];
-    }
+  async fetchHistorical(symbol, interval, from, to) {
+    const response = await fetch(`https://api.example.com/bars?symbol=${symbol}`);
+    const data = await response.json();
+    
+    return data.map(bar => ({
+      time: Math.floor(new Date(bar.date).getTime() / 1000), // Unix seconds
+      open: parseFloat(bar.open),
+      high: parseFloat(bar.high),
+      low: parseFloat(bar.low),
+      close: parseFloat(bar.close),
+      volume: parseFloat(bar.volume || 0)
+    })).sort((a, b) => a.time - b.time); // Sort ascending
+  }
+}
+```
 
-    /**
-     * Search for symbols (optional)
-     * @param {string} query - Search query
-     * @returns {Promise<Array>} Array of symbol objects
-     */
-    async searchSymbols(query) {
-        return [
-            { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ' }
-        ];
-    }
+### Available Methods
+
+| Method | Required | Purpose |
+|--------|----------|---------|
+| `initialize(config)` | ✅ Yes | Connect to data source |
+| `fetchHistorical(symbol, interval, from?, to?)` | ✅ Yes | Load historical bars |
+| `subscribe(symbol, interval, callback)` | Optional | Real-time updates |
+| `searchSymbols(query)` | Optional | Symbol search |
+| `getAvailableIntervals(symbol)` | Optional | List available timeframes |
+| `getBaseInterval(symbol)` | Optional | Get native resolution |
+| `hasData(symbol, interval)` | Optional | Check data availability |
+| `disconnect()` | Optional | Cleanup resources |
+
+### Example Providers
+
+Working implementations you can reference:
+
+- **[CSV Provider](./examples/csv-example/providers/csv-provider.js)** - Static CSV files
+- **[WebSocket Template](./examples/websocket-example/providers/custom-websocket-provider.js)** - Generic real-time
+- **[VoltTrading Provider](./examples/volttrading-integration/volttrading-provider.js)** - Production reference
+
+### Using Your Provider
 
     /**
      * Disconnect and cleanup

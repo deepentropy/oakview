@@ -7,7 +7,7 @@ import cssVariables from './oakview-variables.css?inline';
  * Main entry point for OakView library
  *
  * Usage:
- *   <oakview layout="single" symbol="SPX" theme="dark"></oakview>
+ *   <oak-view layout="single" symbol="SPX" theme="dark"></oak-view>
  *
  * Supported layouts:
  *   - single: 1 chart
@@ -403,6 +403,7 @@ class OakViewChartLayout extends HTMLElement {
               borderVisible: false,
               timeVisible: true,
               secondsVisible: false,
+              rightBarStaysOnScroll: true,
             },
             rightPriceScale: {
               visible: true, // Show price scale on right
@@ -812,8 +813,8 @@ class OakViewChartLayout extends HTMLElement {
 }
 
 // Register custom element
-if (!customElements.get('oakview')) {
-  customElements.define('oakview', OakViewChartLayout);
+if (!customElements.get('oak-view')) {
+  customElements.define('oak-view', OakViewChartLayout);
 }
 
 export default OakViewChartLayout;

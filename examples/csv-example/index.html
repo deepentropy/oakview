@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OakView CSV Example</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -19,7 +20,7 @@
       height: 100vh;
     }
 
-    oakview {
+    oak-view {
       width: 100%;
       height: 100vh;
     }
@@ -65,12 +66,12 @@
     <div>Initializing CSV provider...</div>
   </div>
 
-  <oakview
+  <oak-view
     id="chart"
     layout="single"
     symbol="QQQ"
     theme="dark">
-  </oakview>
+  </oak-view>
 
   <script type="module">
     // Import OakView components and CSV provider

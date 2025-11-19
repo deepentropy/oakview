@@ -1,151 +1,206 @@
 /**
- * CSV Data Provider for OakView
- * Loads historical OHLCV data from CSV files using PapaParse
+ * Multi-File CSV Data Provider for OakView
+ * 
+ * Loads historical data from multiple CSV files with features:
+ * - Automatic CSV file discovery
+ * - Symbol search from available files
+ * - Interval detection and validation
+ *
+ * File naming pattern: {symbol}_{interval}.csv
+ * Example: SPX_1D.csv, QQQ_60.csv (60 = 60 minutes)
+ *
+ * CSV Format (header row required):
+ * time,open,high,low,close,volume
+ * 1672531200,100.5,101.2,99.8,100.0,1000000
  */
 
 import { OakViewDataProvider } from '../../../dist/oakview.es.js';
 
 class CSVDataProvider extends OakViewDataProvider {
-  constructor() {
-    super();
-    this.csvUrl = null;
-    this.cachedData = null;
-  }
-
   /**
-   * Initialize with CSV file URL
    * @param {Object} config
-   * @param {string} config.csvUrl - URL or path to CSV file
+   * @param {string} [config.baseUrl='./data/'] - Base URL or path for CSV files
+   * @param {Array<string>} [config.availableFiles] - List of available CSV files
    */
-  async initialize(config) {
-    if (!config || !config.csvUrl) {
-      throw new Error('CSVDataProvider requires csvUrl in config');
-    }
-    this.csvUrl = config.csvUrl;
-    console.log(`📊 CSVDataProvider initialized with: ${this.csvUrl}`);
+  constructor(config = {}) {
+    super();
+    this.baseUrl = config.baseUrl || './data/';
+    this.availableFiles = config.availableFiles || [];
+    this.fileCache = new Map();
+    this.fileInventory = new Map();
   }
 
-  /**
-   * Fetch historical data from CSV file
-   * @param {string} symbol - Symbol (ignored for CSV, uses configured file)
-   * @param {string} interval - Interval (ignored for CSV)
-   * @param {number} from - Optional start timestamp filter
-   * @param {number} to - Optional end timestamp filter
-   * @returns {Promise<Array>} Array of OHLCV bars
-   */
-  async fetchHistorical(symbol, interval, from = null, to = null) {
-    console.log(`📥 Loading CSV data from: ${this.csvUrl}`);
+  async initialize(config) {
+    console.log('📊 Initializing CSV provider...');
 
-    // Check if we need to load CSV (only load once)
-    if (!this.cachedData) {
-      this.cachedData = await this._loadCSV();
+    if (this.availableFiles.length > 0) {
+      this.buildFileInventory(this.availableFiles);
+      console.log(`✅ CSV provider initialized with ${this.availableFiles.length} files`);
+      console.log('📋 File inventory:', Object.fromEntries(this.fileInventory));
+    } else {
+      console.warn('⚠️ No CSV files provided.');
+    }
+  }
+
+  buildFileInventory(files) {
+    this.fileInventory.clear();
+
+    files.forEach(filename => {
+      const match = filename.match(/^([A-Z0-9]+)_([^.]+)\.csv$/i);
+      if (match) {
+        const [, symbol, interval] = match;
+
+        if (!this.fileInventory.has(symbol)) {
+          this.fileInventory.set(symbol, []);
+        }
+        this.fileInventory.get(symbol).push(interval);
+      }
+    });
+  }
+
+  getBaseInterval(symbol) {
+    const intervals = this.fileInventory.get(symbol);
+    return intervals && intervals.length > 0 ? intervals[0] : null;
+  }
+
+  getAvailableIntervals(symbol) {
+    return this.fileInventory.get(symbol) || [];
+  }
+
+  hasData(symbol, interval) {
+    const intervals = this.fileInventory.get(symbol);
+    return intervals ? intervals.includes(interval) : false;
+  }
+
+  async fetchHistorical(symbol, interval) {
+    const fileKey = `${symbol}_${interval}`;
+
+    console.log(`📥 Fetching ${symbol} @ ${interval}...`);
+
+    if (this.fileCache.has(fileKey)) {
+      console.log(`✅ Loaded ${this.fileCache.get(fileKey).length} bars from cache`);
+      return this.fileCache.get(fileKey);
     }
 
-    // Filter by time range if specified
-    let data = this.cachedData;
-    if (from || to) {
-      data = data.filter(bar => {
-        if (from && bar.time < from) return false;
-        if (to && bar.time > to) return false;
-        return true;
-      });
-      console.log(`📊 Filtered ${this.cachedData.length} bars to ${data.length} bars (${from || 'start'} to ${to || 'end'})`);
+    if (!this.hasData(symbol, interval)) {
+      throw new Error(`No data available for ${symbol} at ${interval} interval`);
     }
 
-    console.log(`✅ Loaded ${data.length} bars from CSV`);
+    const filename = `${symbol}_${interval}.csv`;
+    const url = this.baseUrl + filename;
+    const data = await this._loadCSV(url);
+
+    this.fileCache.set(fileKey, data);
+
+    console.log(`✅ Loaded ${data.length} bars for ${symbol} @ ${interval}`);
     return data;
   }
 
-  /**
-   * Load and parse CSV file using PapaParse
-   * @private
-   * @returns {Promise<Array>} Parsed OHLCV data
-   */
-  async _loadCSV() {
+  async _loadCSV(url) {
     return new Promise((resolve, reject) => {
-      // Check if PapaParse is available
       if (typeof Papa === 'undefined') {
-        reject(new Error('PapaParse library not loaded. Include: <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>'));
+        reject(new Error('PapaParse library not loaded'));
         return;
       }
 
-      Papa.parse(this.csvUrl, {
+      Papa.parse(url, {
         download: true,
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
         complete: (results) => {
           try {
+            console.log(`📋 Raw CSV rows: ${results.data.length}`);
+            
+            // Debug: log first row
+            if (results.data.length > 0) {
+              console.log('📋 First row:', results.data[0]);
+            }
+
             const data = results.data
-              .filter(row => row.time && row.close) // Filter out invalid rows
-              .map(row => ({
-                time: this._parseTime(row.time),
-                open: parseFloat(row.open),
-                high: parseFloat(row.high),
-                low: parseFloat(row.low),
-                close: parseFloat(row.close),
-                volume: parseFloat(row.Volume || row.volume || 0)
-              }))
-              .filter(row => !isNaN(row.time) && !isNaN(row.close)); // Filter NaN
+              .filter(row => row.time && row.close)
+              .map(row => {
+                const bar = {
+                  time: this._parseTime(row.time),
+                  open: parseFloat(row.open),
+                  high: parseFloat(row.high),
+                  low: parseFloat(row.low),
+                  close: parseFloat(row.close),
+                  volume: row.volume || row.Volume ? parseFloat(row.volume || row.Volume) : undefined
+                };
+                return bar;
+              })
+              .filter(bar => !isNaN(bar.time) && !isNaN(bar.close))
+              .sort((a, b) => a.time - b.time);
 
-            // Sort by time ascending
-            data.sort((a, b) => a.time - b.time);
+            console.log(`📊 Parsed ${data.length} valid bars from ${results.data.length} rows`);
 
-            console.log(`📊 Parsed CSV: ${data.length} bars, timeframe: ${this._formatDate(data[0]?.time)} to ${this._formatDate(data[data.length - 1]?.time)}`);
+            if (data.length === 0) {
+              console.error('❌ No valid bars after parsing. Check time and close columns.');
+              reject(new Error(`No valid data in: ${url}`));
+              return;
+            }
+
+            const firstTime = new Date(data[0].time * 1000).toISOString().split('T')[0];
+            const lastTime = new Date(data[data.length - 1].time * 1000).toISOString().split('T')[0];
+            console.log(`📊 Parsed CSV: ${data.length} bars, ${firstTime} to ${lastTime}`);
+
             resolve(data);
           } catch (error) {
-            reject(new Error(`Error parsing CSV data: ${error.message}`));
+            console.error('❌ CSV parsing error:', error);
+            reject(new Error(`Failed to parse CSV: ${error.message}`));
           }
         },
         error: (error) => {
-          reject(new Error(`Error loading CSV file: ${error.message}`));
+          console.error('❌ CSV download error:', error);
+          reject(new Error(`Failed to load CSV: ${error.message}`));
         }
       });
     });
   }
 
-  /**
-   * Parse time string to Unix timestamp
-   * @private
-   * @param {string|number} timeValue
-   * @returns {number} Unix timestamp in seconds
-   */
   _parseTime(timeValue) {
-    if (typeof timeValue === 'number') {
-      // Already a number - check if it's in seconds or milliseconds
-      return timeValue > 10000000000 ? Math.floor(timeValue / 1000) : timeValue;
+    // If it's a Date object (PapaParse with dynamicTyping can parse dates)
+    if (timeValue instanceof Date) {
+      return Math.floor(timeValue.getTime() / 1000);
     }
-    
-    // Parse date string
-    const timestamp = new Date(timeValue).getTime();
-    return Math.floor(timestamp / 1000); // Convert to seconds
+
+    // If already a number (Unix timestamp)
+    if (typeof timeValue === 'number') {
+      // Check if milliseconds (> year 2001 in seconds)
+      return timeValue > 1000000000 ? timeValue : timeValue;
+    }
+
+    // Parse ISO 8601 date string
+    if (typeof timeValue === 'string') {
+      const date = new Date(timeValue);
+      if (isNaN(date.getTime())) {
+        return NaN;
+      }
+      // Return Unix timestamp in seconds
+      return Math.floor(date.getTime() / 1000);
+    }
+
+    return NaN;
   }
 
-  /**
-   * Format timestamp for display
-   * @private
-   * @param {number} timestamp - Unix timestamp in seconds
-   * @returns {string} Formatted date
-   */
-  _formatDate(timestamp) {
-    if (!timestamp) return 'N/A';
-    return new Date(timestamp * 1000).toISOString().split('T')[0];
+  async searchSymbols(query) {
+    const symbols = Array.from(this.fileInventory.keys());
+    const filtered = query
+      ? symbols.filter(s => s.toLowerCase().includes(query.toLowerCase()))
+      : symbols;
+
+    return filtered.map(symbol => ({
+      symbol,
+      name: symbol,
+      description: `${symbol} (CSV Data)`,
+      exchange: 'CSV'
+    }));
   }
 
-  /**
-   * CSV provider doesn't support real-time data
-   */
-  subscribe(symbol, interval, callback) {
-    console.warn('CSVDataProvider does not support real-time subscriptions');
-    return () => {}; // Return no-op unsubscribe
-  }
-
-  /**
-   * Clear cached data
-   */
   disconnect() {
-    this.cachedData = null;
-    console.log('📊 CSVDataProvider disconnected, cache cleared');
+    this.fileCache.clear();
+    console.log('📊 CSVDataProvider disconnected');
   }
 }
 

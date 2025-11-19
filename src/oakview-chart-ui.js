@@ -2817,6 +2817,7 @@ class OakViewChart extends HTMLElement {
         borderColor: this.theme === 'light' ? '#E1E3E6' : '#2B2B43',
         timeVisible: true,
         secondsVisible: false,
+        rightBarStaysOnScroll: true,
       },
     };
 

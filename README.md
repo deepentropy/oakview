@@ -388,7 +388,9 @@ oakview/
 2. **Full Control**: Direct access to lightweight-charts API via `getChart()`
 3. **UI Convenience**: Built-in toolbar for common operations
 4. **No Wrappers**: Don't duplicate lightweight-charts API - expose it directly
-5. **Single Entry Point**: Use `<oakview>` for all applications
+5. **Single Entry Point**: Use `<oak-view>` for all applications - it's the only public component
+
+**Note**: `<oak-view>` internally uses `<oakview-chart>` elements for individual panes, but you should **never** use `<oakview-chart>` directly. Always use `<oak-view>` which manages the layout, toolbar, and multiple chart panes.
 
 ## Browser Support
 

@@ -4,7 +4,7 @@
  * A lightweight charting library based on TradingView's lightweight-charts v5
  * with built-in UI components and flexible data provider architecture.
  *
- * Main Entry Point: <oakview>
+ * Main Entry Point: <oak-view>
  * - Full-featured chart layout with toolbar, multiple panes, and flexible configuration
  * - Use this component for production applications
  *

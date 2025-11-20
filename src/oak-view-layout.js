@@ -1,6 +1,7 @@
 import { createChart } from 'lightweight-charts';
 import './oak-view-chart.js';    // Individual chart component
 import cssVariables from './oakview-variables.css?inline';
+import BarResampler from './utils/BarResampler.js';
 
 /**
  * OakView - Multi-pane chart layout component
@@ -27,6 +28,11 @@ class OakViewChartLayout extends HTMLElement {
     this._previousLayout = null; // Store layout before expansion
     this._paneSettings = new Map(); // Store per-pane settings (symbol, interval, etc.)
     this._storageKey = 'oakview-layout-config'; // localStorage key
+    
+    // Resampling support
+    this._baseSubscription = null; // Single subscription to base interval
+    this._baseInterval = null; // Finest interval across all panes
+    this._resamplers = new Map(); // paneId -> BarResampler
   }
 
   static get observedAttributes() {
@@ -715,6 +721,127 @@ class OakViewChartLayout extends HTMLElement {
    */
   getDataProvider() {
     return this._dataProvider;
+  }
+
+  // ============================================================================
+  // Client-Side Resampling
+  // ============================================================================
+
+  /**
+   * Find the finest (smallest duration) interval from a list
+   * @param {Array<string>} intervals - List of interval strings
+   * @returns {string} Finest interval
+   * @private
+   */
+  _findFinestInterval(intervals) {
+    if (intervals.length === 0) return '1D';
+    if (intervals.length === 1) return intervals[0];
+    
+    const parseToMs = (interval) => {
+      try {
+        const resampler = new BarResampler(interval, interval);
+        return resampler.parseIntervalToMs(interval);
+      } catch (e) {
+        return Infinity; // Invalid intervals go to end
+      }
+    };
+    
+    return intervals.reduce((finest, current) => {
+      return parseToMs(current) < parseToMs(finest) ? current : finest;
+    });
+  }
+
+  /**
+   * Distribute incoming bar to all panes (with resampling)
+   * @param {Object} sourceBar - OHLCV bar from base interval subscription
+   * @private
+   */
+  _distributeBar(sourceBar) {
+    this._paneSettings.forEach((settings, paneId) => {
+      const paneIndex = this._getPaneIndexById(paneId);
+      if (paneIndex === -1) return;
+      
+      const chart = this.getChartAt(paneIndex);
+      if (!chart) return;
+      
+      const targetInterval = settings.interval;
+      
+      if (targetInterval === this._baseInterval) {
+        // Direct pass - no resampling needed
+        chart.updateRealtime(sourceBar);
+      } else {
+        // Resample to target interval
+        const resamplerKey = `${paneId}:${targetInterval}`;
+        
+        if (!this._resamplers.has(resamplerKey)) {
+          this._resamplers.set(
+            resamplerKey,
+            new BarResampler(this._baseInterval, targetInterval)
+          );
+          console.log(`📊 Created resampler ${this._baseInterval} → ${targetInterval} for pane ${paneIndex}`);
+        }
+        
+        const resampler = this._resamplers.get(resamplerKey);
+        const resampledBar = resampler.addBar(sourceBar);
+        
+        if (resampledBar) {
+          chart.updateRealtime(resampledBar);
+        }
+      }
+    });
+  }
+
+  /**
+   * Get pane index by pane ID
+   * @param {string} paneId - Pane ID
+   * @returns {number} Index or -1 if not found
+   * @private
+   */
+  _getPaneIndexById(paneId) {
+    return this._panes.findIndex(pane => {
+      const id = this.getPaneId(this._panes.indexOf(pane));
+      return id === paneId;
+    });
+  }
+
+  /**
+   * Subscribe to symbol with automatic resampling for multi-interval support
+   * Subscribes to finest interval once, resamples for coarser intervals
+   * @param {string} symbol - Symbol to subscribe to
+   * @private
+   */
+  _subscribeToSymbol(symbol) {
+    // Collect intervals from all panes
+    const intervals = Array.from(this._paneSettings.values())
+      .map(s => s.interval)
+      .filter(i => i);
+      
+    if (intervals.length === 0) return;
+    
+    // Determine finest interval
+    const baseInterval = this._findFinestInterval(intervals);
+    this._baseInterval = baseInterval;
+    
+    console.log(`📊 Subscribing to ${symbol} @ ${baseInterval} (base interval)`);
+    console.log(`   Pane intervals: ${intervals.join(', ')}`);
+    
+    // Unsubscribe from previous
+    if (this._baseSubscription) {
+      this._baseSubscription();
+      this._baseSubscription = null;
+    }
+    
+    // Clear resamplers
+    this._resamplers.clear();
+    
+    // Subscribe once to base interval
+    if (this._dataProvider && typeof this._dataProvider.subscribe === 'function') {
+      this._baseSubscription = this._dataProvider.subscribe(
+        symbol,
+        baseInterval,
+        (bar) => this._distributeBar(bar)
+      );
+    }
   }
 
   // ============================================================================

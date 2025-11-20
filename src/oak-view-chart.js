@@ -8,6 +8,7 @@ import {
   HistogramSeries
 } from 'lightweight-charts';
 import cssVariables from './oakview-variables.css?inline';
+import BarResampler from './utils/BarResampler.js';
 
 /**
  * OakView Chart Web Component with Built-in UI
@@ -105,6 +106,94 @@ class OakViewChart extends HTMLElement {
   setData(data) {
     this._data = data;
     this.updateChartType();
+  }
+
+  /**
+   * Resample historical OHLCV data from finer to coarser interval
+   * 
+   * @param {Array} sourceBars - Source OHLCV bars (fine granularity)
+   * @param {string} targetInterval - Target interval (e.g., '10S', '1', '1D')
+   * @returns {Array} Resampled OHLCV bars (coarse granularity)
+   * @public
+   * @example
+   * // Resample 1-second bars to 10-second bars
+   * const secondBars = await provider.fetchHistorical('SPX', '1S');
+   * const tenSecondBars = chart.resampleHistoricalData(secondBars, '10S');
+   * chart.setData(tenSecondBars);
+   */
+  resampleHistoricalData(sourceBars, targetInterval) {
+    if (!sourceBars || sourceBars.length === 0) {
+      return [];
+    }
+    
+    const resampler = new BarResampler('source', targetInterval);
+    const resampledBars = [];
+    
+    for (const bar of sourceBars) {
+      const resampledBar = resampler.addBar(bar);
+      if (resampledBar) {
+        resampledBars.push(resampledBar);
+      }
+    }
+    
+    // Flush the last incomplete bar
+    const lastBar = resampler.flush();
+    if (lastBar) {
+      resampledBars.push(lastBar);
+    }
+    
+    return resampledBars;
+  }
+
+  /**
+   * Load symbol data with optional client-side resampling
+   * 
+   * If the data provider declares a base interval and the requested interval
+   * is coarser, this will fetch base interval data and resample client-side.
+   * 
+   * @param {string} symbol - Symbol to load
+   * @param {string} interval - Requested interval
+   * @returns {Promise<void>}
+   * @public
+   */
+  async loadSymbolData(symbol, interval) {
+    if (!this._dataProvider) {
+      console.warn('No data provider set');
+      return;
+    }
+    
+    try {
+      const baseInterval = this._dataProvider.getBaseInterval?.(symbol);
+      
+      // If no base interval or requesting base interval, fetch directly
+      if (!baseInterval || interval === baseInterval) {
+        const data = await this._dataProvider.fetchHistorical(symbol, interval);
+        this.setData(data);
+        return;
+      }
+      
+      // Check if we need to resample
+      const baseMs = this.parseIntervalToMs(baseInterval);
+      const targetMs = this.parseIntervalToMs(interval);
+      
+      if (targetMs > baseMs) {
+        // Fetch base interval data and resample to target
+        console.log(`📊 Fetching ${symbol} @ ${baseInterval} (base) → resampling to ${interval}`);
+        
+        const baseData = await this._dataProvider.fetchHistorical(symbol, baseInterval);
+        const resampledData = this.resampleHistoricalData(baseData, interval);
+        
+        console.log(`✅ Resampled ${baseData.length} bars → ${resampledData.length} bars`);
+        this.setData(resampledData);
+      } else {
+        // Target interval is finer than base - must request from provider
+        const data = await this._dataProvider.fetchHistorical(symbol, interval);
+        this.setData(data);
+      }
+    } catch (error) {
+      console.error('Failed to load symbol data:', error);
+      throw error;
+    }
   }
 
   /**
@@ -2189,6 +2278,35 @@ class OakViewChart extends HTMLElement {
   }
 
   /**
+   * Format interval for display (e.g., "1" → "1", "60" → "1H", "1D" → "D")
+   * @param {string} interval - Interval string
+   * @returns {string} Formatted interval
+   * @private
+   */
+  formatIntervalDisplay(interval) {
+    if (!interval) return 'D';
+    
+    // If already formatted with unit, just use the unit part
+    if (interval.match(/[HDWMY]$/)) {
+      return interval.replace(/^\d+/, '').toUpperCase() || interval;
+    }
+    
+    // Convert numeric minutes to display format
+    const minutes = parseInt(interval);
+    if (isNaN(minutes)) return interval;
+    
+    if (minutes >= 1440) {
+      const days = minutes / 1440;
+      return days === 1 ? 'D' : `${days}D`;
+    }
+    if (minutes >= 60) {
+      const hours = minutes / 60;
+      return `${hours}H`;
+    }
+    return `${minutes}`;
+  }
+
+  /**
    * Update available intervals based on data provider
    * @param {string} symbol - Symbol to check intervals for
    * @private
@@ -2335,6 +2453,19 @@ class OakViewChart extends HTMLElement {
       default:
         return 1440;
     }
+  }
+
+  /**
+   * Parse interval string to milliseconds (for resampling)
+   * Delegates to BarResampler's parsing logic
+   * 
+   * @param {string} interval - Interval string
+   * @returns {number} Milliseconds
+   * @private
+   */
+  parseIntervalToMs(interval) {
+    const resampler = new BarResampler('dummy', interval);
+    return resampler.parseIntervalToMs(interval);
   }
 
   setupEventListeners() {

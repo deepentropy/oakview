@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig({
-  base: '/', // Hardcoded for tests
+  base: '/',
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.js'),

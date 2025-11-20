@@ -1,0 +1,89 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button "Symbol Search" [ref=e9] [cursor=pointer]:
+        - img [ref=e10]
+        - generic [ref=e12]: QQQ
+      - button "1H" [ref=e15] [cursor=pointer]
+      - button "Chart Type" [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+      - button "Layout" [ref=e23] [cursor=pointer]:
+        - img [ref=e24]
+      - generic [ref=e27]:
+        - button "Indicators, metrics, and strategies" [ref=e28] [cursor=pointer]:
+          - img [ref=e29]
+          - generic [ref=e32]: Indicators
+        - button "Favorites" [ref=e33] [cursor=pointer]:
+          - img [ref=e34]
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: AAPL
+              - generic: •
+              - generic: 1D
+              - generic: •
+              - generic: NASDAQ
+            - generic:
+              - generic:
+                - generic: O
+                - generic: —
+              - generic:
+                - generic: H
+                - generic: —
+              - generic:
+                - generic: L
+                - generic: —
+              - generic:
+                - generic: C
+                - generic: —
+          - table [ref=e36]:
+            - row "Charting by TradingView" [ref=e37]:
+              - cell
+              - cell "Charting by TradingView" [ref=e38]:
+                - link "Charting by TradingView" [ref=e42] [cursor=pointer]:
+                  - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/examples/csv-example/index.html
+                  - img [ref=e43]
+              - cell
+            - row [ref=e47]:
+              - cell
+              - cell [ref=e48]
+              - cell
+  - generic [ref=e60] [cursor=pointer]:
+    - generic:
+      - generic:
+        - generic: AAPL
+        - generic: •
+        - generic: 1D
+        - generic: •
+        - generic: NASDAQ
+      - generic:
+        - generic:
+          - generic: O
+          - generic: —
+        - generic:
+          - generic: H
+          - generic: —
+        - generic:
+          - generic: L
+          - generic: —
+        - generic:
+          - generic: C
+          - generic: —
+    - table [ref=e62]:
+      - row "Charting by TradingView" [ref=e63]:
+        - cell
+        - cell "Charting by TradingView" [ref=e64]:
+          - link "Charting by TradingView" [ref=e68]:
+            - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/examples/csv-example/index.html
+            - img [ref=e69]
+        - cell [ref=e73]
+      - row [ref=e77]:
+        - cell
+        - cell [ref=e78]
+        - cell [ref=e82]
+```

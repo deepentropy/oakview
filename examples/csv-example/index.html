@@ -136,14 +136,17 @@
         // Get base interval for this symbol
         const baseInterval = provider.getBaseInterval(symbol);
         const availableIntervals = provider.getAvailableIntervals(symbol);
-        const isResampled = baseInterval !== interval && !provider.hasData(symbol, interval);
+        const hasNativeData = provider.hasData(symbol, interval);
+        const needsResampling = baseInterval && baseInterval !== interval && !hasNativeData;
 
         console.log('Base interval:', baseInterval);
         console.log('Available intervals:', availableIntervals);
-        console.log('Will resample:', isResampled);
+        console.log('Has native data:', hasNativeData);
+        console.log('Needs resampling:', needsResampling);
 
-        // Fetch data (will auto-resample if needed)
-        currentData = await provider.fetchHistorical(symbol, interval);
+        // Fetch data - get base interval if resampling needed
+        const fetchInterval = needsResampling ? baseInterval : interval;
+        currentData = await provider.fetchHistorical(symbol, fetchInterval);
 
         // Update ALL charts in the layout
         const chartCount = chart.getChartCount();

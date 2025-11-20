@@ -169,8 +169,9 @@
         for (let i = 0; i < chartCount; i++) {
           const chartElement = chart.getChartAt(i);
           if (chartElement) {
-            chartElement.setData(currentData);
             chartElement.setAttribute('symbol', symbol);
+            chartElement.setAttribute('interval', interval);
+            chartElement.setData(currentData);
           }
         }
 

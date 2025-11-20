@@ -106,6 +106,13 @@ class OakViewChart extends HTMLElement {
   setData(data) {
     this._data = data;
     this.updateChartType();
+    
+    // Update legend with current symbol and interval
+    const symbol = this.getAttribute('symbol');
+    const interval = this.getAttribute('interval') || '1D';
+    if (symbol) {
+      this.updateLegend(symbol, interval);
+    }
   }
 
   /**
@@ -163,12 +170,17 @@ class OakViewChart extends HTMLElement {
     }
     
     try {
+      // Update symbol and interval attributes
+      this.setAttribute('symbol', symbol);
+      this.setAttribute('interval', interval);
+      
       const baseInterval = this._dataProvider.getBaseInterval?.(symbol);
       
       // If no base interval or requesting base interval, fetch directly
       if (!baseInterval || interval === baseInterval) {
         const data = await this._dataProvider.fetchHistorical(symbol, interval);
         this.setData(data);
+        this.updateLegend(symbol, interval);
         return;
       }
       
@@ -185,10 +197,12 @@ class OakViewChart extends HTMLElement {
         
         console.log(`✅ Resampled ${baseData.length} bars → ${resampledData.length} bars`);
         this.setData(resampledData);
+        this.updateLegend(symbol, interval);
       } else {
         // Target interval is finer than base - must request from provider
         const data = await this._dataProvider.fetchHistorical(symbol, interval);
         this.setData(data);
+        this.updateLegend(symbol, interval);
       }
     } catch (error) {
       console.error('Failed to load symbol data:', error);

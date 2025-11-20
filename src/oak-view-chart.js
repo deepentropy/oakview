@@ -2208,6 +2208,22 @@ class OakViewChart extends HTMLElement {
       console.log(`Available intervals for ${symbol}:`, availableIntervals);
       console.log(`Base interval: ${baseInterval}`);
 
+      // Auto-update interval to base interval when symbol changes
+      if (baseInterval && availableIntervals.includes(baseInterval)) {
+        const currentInterval = this.getAttribute('interval');
+        if (currentInterval !== baseInterval) {
+          this.setAttribute('interval', baseInterval);
+          
+          // Update interval button text
+          const intervalBtn = this.shadowRoot.querySelector('.interval-button');
+          if (intervalBtn) {
+            intervalBtn.textContent = this.formatIntervalDisplay(baseInterval);
+          }
+          
+          console.log(`✓ Auto-updated interval to base interval: ${baseInterval}`);
+        }
+      }
+
       // Define interval hierarchy (in ascending order of duration)
       // Using both minute notation (1, 5, 60, 120) and H/D/W/M/Y notation
       const intervalHierarchy = [

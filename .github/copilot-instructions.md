@@ -4,9 +4,30 @@
 
 **What is OakView?**
 - JavaScript library wrapper around TradingView's lightweight-charts v5
-- Provides Web Components (`<oak-view-chart>`, `<oak-view-layout>`)
+- **Goal:** Strictly mirror TradingView web interface, pixel-perfect
+- Provides `<oak-view>` Web Component for chart embedding (internal implementation detail)
 - Adds TradingView-like UI/UX (symbol search, interval selector, chart type toolbar, drawing tools)
 - Data provider abstraction for flexible data sources (WebSocket, REST API, CSV, etc.)
+
+**Development Stack:**
+- TypeScript (primary language)
+- Lightweight-Charts v5 API (NOT v4)
+- ES6+ modules
+- Web Components (internal, not exposed to integrators)
+
+**TradingView Design Resources:**
+- Complete interface: `docs/design/complete/` (HTML/CSS/JS reference)
+- Reference image: `docs/design/tradingview.png`
+- Design specifications: `docs/tv_systematic_analysis/design_specification.md`
+- SVG icons: `docs/tv_systematic_analysis/svg_icons/`
+
+**Lightweight-Charts v5 Documentation:**
+- Main docs: https://tradingview.github.io/lightweight-charts/docs
+- Tutorials: https://tradingview.github.io/lightweight-charts/tutorials
+- API reference: https://tradingview.github.io/lightweight-charts/docs/api
+- **IMPORTANT:** v4→v5 migration guide: https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5
+- Plugin creation: https://tradingview.github.io/lightweight-charts/docs/plugins/intro
+- Indicators integration: https://tradingview.github.io/lightweight-charts/tutorials/analysis-indicators
 
 **Your Role:**
 You are the primary maintainer of the OakView library. You:
@@ -14,6 +35,7 @@ You are the primary maintainer of the OakView library. You:
 - Implement new features when approved
 - Respond to developer integration issues
 - Maintain API consistency and stability
+- Ensure pixel-perfect TradingView interface matching
 
 **Odyssée's Role:**
 - Approves/rejects new feature implementations
@@ -165,23 +187,64 @@ At the beginning of each session:
 
 ## Key Principles
 
-1. **API First** - Guide developers to use public API
+1. **API First** - Guide developers to use public API (not Web Component internals)
 2. **Examples Over Docs** - Show working code, not explanations
 3. **Minimal Changes** - Fix bugs surgically, don't refactor
 4. **LLM Audience** - Structure for machine parsing, not human reading
 5. **Approval Required** - API changes need Odyssée's approval
 6. **Clean Workspace** - Use `.tmp/` for all temporary files
+7. **Pixel-Perfect UI** - Match TradingView interface exactly (use design specs in `docs/`)
+8. **TypeScript First** - Write in TypeScript, maintain type safety
+9. **v5 Only** - Use lightweight-charts v5 API, consult migration guide if needed
+
+---
+
+## Technical Guidelines
+
+### Lightweight-Charts v5 API
+- **Always use v5 API** - NOT v4
+- **Migration guide:** https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5
+- **Series creation:** Use class imports (`CandlestickSeries`, `LineSeries`, not string names)
+- **Time format:** Unix timestamp (seconds) or `{ year, month, day }`
+- **Plugins:** https://tradingview.github.io/lightweight-charts/docs/plugins/intro
+- **Indicators:** https://tradingview.github.io/lightweight-charts/tutorials/analysis-indicators
+
+### TypeScript
+- Primary development language
+- Maintain type definitions in `src/data-providers/types.d.ts`
+- Keep JSDoc comments synchronized with TypeScript types
+- Use explicit types, avoid `any`
+
+### TradingView UI Matching
+- **Reference:** `docs/tv_systematic_analysis/design_specification.md`
+- **Colors, spacing, fonts:** Must match exactly
+- **Icons:** Use SVG icons from `docs/tv_systematic_analysis/svg_icons/`
+- **Behavior:** Match TradingView toolbar/button interactions
+- **Layout:** Match pane layout, toolbar positioning
+- **Complete reference:** `docs/design/complete/` (working HTML/CSS/JS)
+
+### Browser Compatibility
+- ES6+ syntax (uses Vite for bundling)
+- Web Components (Custom Elements v1) - internal implementation
+- No IE11 support required
+
+### Testing
+- Manual testing with examples
+- No automated tests currently (this is OK)
+- Verify changes in `examples/csv-example/`
 
 ---
 
 ## Quick Reference
 
 ### Key Files
-- `src/oak-view-chart.js` - Main chart component
+- `src/oak-view-chart.js` - Main chart component (TypeScript when converted)
 - `src/oak-view-layout.js` - Layout system
 - `src/data-providers/base.js` - Data provider base class
 - `src/data-providers/types.d.ts` - TypeScript definitions
 - `examples/csv-example/` - Basic integration example
+- `docs/tv_systematic_analysis/design_specification.md` - TradingView UI specs
+- `docs/design/complete/` - TradingView reference implementation
 
 ### Key Commands
 ```bash
@@ -192,7 +255,14 @@ npm run dev            # Start dev server
 ### Key Patterns
 - Real-time: `setData()` → `subscribe()` → `updateRealtime()`
 - Data Provider: Extend `OakViewDataProvider`
-- Chart Access: Use public methods, not `getChart()` unless documented
+- Chart Access: Use public methods, not Web Component internals
+
+### Key URLs (Lightweight-Charts v5)
+- Docs: https://tradingview.github.io/lightweight-charts/docs
+- API: https://tradingview.github.io/lightweight-charts/docs/api
+- Migration: https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5
+- Plugins: https://tradingview.github.io/lightweight-charts/docs/plugins/intro
+- Indicators: https://tradingview.github.io/lightweight-charts/tutorials/analysis-indicators
 
 ---
 

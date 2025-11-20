@@ -148,22 +148,33 @@
         const fetchInterval = needsResampling ? baseInterval : interval;
         currentData = await provider.fetchHistorical(symbol, fetchInterval);
 
+        console.log(`✓ Fetched ${currentData.length} bars @ ${fetchInterval}`);
+
+        // Resample if needed
+        if (needsResampling) {
+          const chartInstance = chart.getChartAt(0);
+          if (chartInstance && typeof chartInstance.resampleHistoricalData === 'function') {
+            console.log(`📊 Resampling ${fetchInterval} → ${interval}...`);
+            currentData = chartInstance.resampleHistoricalData(currentData, interval);
+            console.log(`✅ Resampled to ${currentData.length} bars @ ${interval}`);
+          } else {
+            console.warn('⚠️ Chart does not support resampling, using base interval data');
+          }
+        }
+
         // Update ALL charts in the layout
         const chartCount = chart.getChartCount();
-        console.log(`Updating ${chartCount} chart(s) with data`);
+        console.log(`Updating ${chartCount} chart(s) with ${currentData.length} bars`);
 
         for (let i = 0; i < chartCount; i++) {
           const chartElement = chart.getChartAt(i);
           if (chartElement) {
-            console.log(`Setting data for chart ${i}`, chartElement);
             chartElement.setData(currentData);
             chartElement.setAttribute('symbol', symbol);
-          } else {
-            console.warn(`Chart ${i} not found!`);
           }
         }
 
-        console.log(`✓ Loaded ${currentData.length} bars`);
+        console.log(`✓ Loaded ${currentData.length} bars @ ${interval}`);
       } catch (error) {
         console.error('Failed to load data:', error);
         alert(`Failed to load ${symbol}: ${error.message}`);
@@ -210,3 +221,4 @@
   </script>
 </body>
 </html>
+

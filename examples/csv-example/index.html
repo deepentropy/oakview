@@ -69,7 +69,7 @@
   <oak-view
     id="chart"
     layout="single"
-    symbol="QQQ"
+    symbol="BATS_TSLA"
     theme="dark">
   </oak-view>
 
@@ -81,12 +81,14 @@
     // Available CSV files (manually list them here)
     // In a real app, you might fetch this from a manifest file or API
     const AVAILABLE_CSV_FILES = [
-      'SPX_1D.csv', 'QQQ_60.csv',
-      // Add more files as you create them:
-      // 'AAPL_1H.csv',
-      // 'AAPL_1D.csv',
-      // 'GOOGL_1D.csv',
-      // etc.
+      'BATS_TSLA, 1S_0fe10.csv',
+      'BATS_TSLA, 1S_ad358.csv',
+      'BATS_KLAR, 5_e5352.csv',
+      'BATS_OKLO, 1W_5a320.csv',
+      'SP_SPX, 1_12577.csv',
+      'SP_SPX, 1_14183.csv',
+      'CME_DL_BTC1!, 1_c020b.csv',
+      'FX_EURUSD, 120_43b6a.csv',
     ];
 
     // Get DOM elements
@@ -100,8 +102,8 @@
     });
 
     // Current state
-    let currentSymbol = 'QQQ';
-    let currentInterval = '60';
+    let currentSymbol = 'QQQ';  // Try QQQ first, fallback to BATS_TSLA
+    let currentInterval = null;  // Will be set from provider's base interval
     let currentData = null;
 
     // Initialize
@@ -114,6 +116,17 @@
 
         // Set provider on chart
         chart.setDataProvider(provider);
+
+        // Check if QQQ exists, otherwise use first available symbol
+        const availableSymbols = Array.from(provider.fileInventory.keys());
+        if (!provider.fileInventory.has(currentSymbol) && availableSymbols.length > 0) {
+          currentSymbol = availableSymbols[0];
+          console.log(`QQQ not found, using ${currentSymbol} instead`);
+        }
+
+        // Get base interval for initial symbol
+        currentInterval = provider.getBaseInterval(currentSymbol) || '1D';
+        console.log(`Using base interval: ${currentInterval} for ${currentSymbol}`);
 
         // Load initial data
         await loadSymbol(currentSymbol, currentInterval);

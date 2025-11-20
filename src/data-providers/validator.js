@@ -111,11 +111,11 @@ export async function validateProvider(provider, options = {}) {
             severity: 'error'
           });
         } else if (typeof bar.time === 'number') {
-          // Check if milliseconds instead of seconds
-          if (bar.time > 10000000000) {
+          // Check if milliseconds instead of seconds (integer part only)
+          if (Math.floor(bar.time) > 10000000000) {
             errors.push({
               method: 'fetchHistorical',
-              message: `Time appears to be in milliseconds (${bar.time}). Must be Unix seconds. Convert with: Math.floor(timestamp / 1000)`,
+              message: `Time appears to be in milliseconds (${bar.time}). Must be Unix seconds (with optional decimal for sub-second precision). Convert with: timestamp / 1000`,
               severity: 'error'
             });
           }

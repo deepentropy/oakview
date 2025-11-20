@@ -1,17 +1,17 @@
 /**
  * BarResampler - Aggregates OHLCV bars from finer to coarser intervals
  * 
- * Example: 1-second bars → 10-second bars, ticks → 1-minute bars
+ * Example: 100ms bars → 1-second bars, ticks → 1-minute bars
  * 
  * @example
- * const resampler = new BarResampler('1S', '10S');
+ * const resampler = new BarResampler('100ms', '1S');
  * 
  * // Feed source bars
- * const bar1 = resampler.addBar({ time: 0, open: 100, high: 101, low: 99, close: 100.5, volume: 1000 });
+ * const bar1 = resampler.addBar({ time: 1000.100, open: 100, high: 101, low: 99, close: 100.5, volume: 1000 });
  * // Returns null (bar not complete)
  * 
- * const bar10 = resampler.addBar({ time: 9, ... });
- * // Returns completed 10-second bar aggregated from 10 1-second bars
+ * const bar10 = resampler.addBar({ time: 1000.900, ... });
+ * // Returns completed 1-second bar aggregated from 10 100ms bars
  */
 class BarResampler {
   /**
@@ -29,7 +29,7 @@ class BarResampler {
    * Add a source bar and potentially get a completed target bar
    * 
    * @param {Object} sourceBar - OHLCV bar from data provider
-   * @param {number} sourceBar.time - Unix timestamp in seconds
+   * @param {number} sourceBar.time - Unix timestamp in seconds (supports sub-second precision as decimal)
    * @param {number} sourceBar.open - Opening price
    * @param {number} sourceBar.high - High price
    * @param {number} sourceBar.low - Low price
@@ -68,10 +68,11 @@ class BarResampler {
   
   /**
    * Calculate target bar time bucket
-   * Aligns time to interval boundaries (e.g., 10:30:05 → 10:30:00 for 10S)
+   * Aligns time to interval boundaries (e.g., 10:30:05.500 → 10:30:05.000 for 1S)
+   * Supports sub-second precision
    * 
-   * @param {number} sourceTime - Unix timestamp in seconds
-   * @returns {number} Aligned timestamp in seconds
+   * @param {number} sourceTime - Unix timestamp in seconds (may have decimal for milliseconds)
+   * @returns {number} Aligned timestamp in seconds (with decimal precision preserved)
    */
   getTargetBarTime(sourceTime) {
     const timeMs = sourceTime * 1000;
@@ -82,6 +83,7 @@ class BarResampler {
    * Parse interval string to milliseconds
    * 
    * Supported formats:
+   * - Milliseconds: 1ms, 10ms, 100ms, 1000ms
    * - Ticks: 1T, 10T, 100T, 1000T (not time-based, treated as count)
    * - Seconds: 1S, 5S, 10S, 15S, 30S, 45S
    * - Minutes: 1, 5, 15, 30, 45 (plain numbers)
@@ -95,39 +97,49 @@ class BarResampler {
    * @throws {Error} If interval format is invalid
    */
   parseIntervalToMs(interval) {
+    // Normalize interval string
+    interval = String(interval).trim();
+    
+    // Handle millisecond intervals
+    if (interval.toLowerCase().endsWith('ms')) {
+      const ms = parseInt(interval);
+      if (isNaN(ms)) throw new Error(`Invalid millisecond interval: ${interval}`);
+      return ms;
+    }
+    
     // Handle tick intervals (special case - not time-based)
-    if (interval.endsWith('T')) {
+    if (interval.toUpperCase().endsWith('T')) {
       const tickCount = parseInt(interval);
       if (isNaN(tickCount)) throw new Error(`Invalid tick interval: ${interval}`);
       // Treat ticks as milliseconds for bucketing purposes
       return tickCount;
     }
     
-    // Handle second intervals explicitly
-    if (interval.endsWith('S')) {
+    // Handle second intervals explicitly (both 's' and 'S')
+    if (interval.toLowerCase().endsWith('s') && !interval.toLowerCase().endsWith('ms')) {
       const seconds = parseInt(interval);
       if (isNaN(seconds)) throw new Error(`Invalid second interval: ${interval}`);
       return seconds * 1000;
     }
     
-    // Handle other intervals
-    const match = interval.match(/^(\d+)([mHDWMY]?)$/);
+    // Handle other intervals (m, H, D, W, M, Y)
+    const match = interval.match(/^(\d+)([mHDWMY]?)$/i);
     if (!match) throw new Error(`Invalid interval format: ${interval}`);
     
     const [, num, unit] = match;
     const value = parseInt(num);
     
-    switch(unit) {
+    switch(unit.toLowerCase()) {
       case '': // Plain number = minutes
       case 'm':
         return value * 60 * 1000;
-      case 'H':
+      case 'h':
         return value * 60 * 60 * 1000;
-      case 'D':
+      case 'd':
         return value * 24 * 60 * 60 * 1000;
-      case 'W':
+      case 'w':
         return value * 7 * 24 * 60 * 60 * 1000;
-      case 'M':
+      case 'm':
         return value * 30 * 24 * 60 * 60 * 1000; // Approximate
       case 'Y':
         return value * 365 * 24 * 60 * 60 * 1000; // Approximate

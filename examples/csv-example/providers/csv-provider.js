@@ -37,63 +37,138 @@ class CSVDataProvider extends OakViewDataProvider {
       this.buildFileInventory(this.availableFiles);
       console.log(`✅ CSV provider initialized with ${this.availableFiles.length} files`);
       console.log('📋 File inventory:', Object.fromEntries(this.fileInventory));
+      
+      // Preload first file for each symbol to detect intervals
+      await this.preloadIntervals();
     } else {
       console.warn('⚠️ No CSV files provided.');
     }
+  }
+
+  async preloadIntervals() {
+    console.log('🔍 Preloading intervals for all symbols...');
+    const promises = [];
+    
+    for (const [symbol, files] of this.fileInventory.entries()) {
+      if (files.length > 0) {
+        // Preload first file to detect interval
+        const promise = this.fetchHistorical(symbol, null).catch(err => {
+          console.warn(`Failed to preload ${symbol}:`, err.message);
+        });
+        promises.push(promise);
+      }
+    }
+    
+    await Promise.all(promises);
+    console.log('✓ Intervals preloaded for all symbols');
   }
 
   buildFileInventory(files) {
     this.fileInventory.clear();
 
     files.forEach(filename => {
-      const match = filename.match(/^([A-Z0-9]+)_([^.]+)\.csv$/i);
+      // Handle formats: SYMBOL_INTERVAL.csv or EXCHANGE_SYMBOL, INTERVAL_HASH.csv
+      let symbol;
+      
+      // Try new format: EXCHANGE_SYMBOL, INTERVAL_HASH.csv
+      let match = filename.match(/^([A-Z]+)_([A-Z0-9]+),\s*([^_]+)_[^.]+\.csv$/i);
       if (match) {
-        const [, symbol, interval] = match;
+        const [, exchange, sym] = match;
+        symbol = `${exchange}_${sym}`;
+      } else {
+        // Try old format: SYMBOL_INTERVAL.csv
+        match = filename.match(/^([A-Z0-9_]+)_([^.]+)\.csv$/i);
+        if (match) {
+          [, symbol] = match;
+        }
+      }
 
+      if (symbol) {
         if (!this.fileInventory.has(symbol)) {
           this.fileInventory.set(symbol, []);
         }
-        this.fileInventory.get(symbol).push(interval);
+        // Interval will be detected from data when loaded
+        this.fileInventory.get(symbol).push(filename);
       }
     });
   }
 
+  _normalizeInterval(interval) {
+    // Map interval formats to standard format
+    // 1S -> 1S (1 second)
+    // 5 -> 5 (5 minutes) 
+    // 1W -> 1W (1 week)
+    // 1D -> 1D (1 day)
+    // 60 -> 60 (60 minutes)
+    
+    // Keep interval as-is - OakView handles all formats
+    return interval.toUpperCase();
+  }
+
   getBaseInterval(symbol) {
-    const intervals = this.fileInventory.get(symbol);
-    return intervals && intervals.length > 0 ? intervals[0] : null;
+    // Return null - interval will be detected from actual data
+    const files = this.fileInventory.get(symbol);
+    if (!files || files.length === 0) return null;
+    
+    // Check cache for first file's detected interval
+    const firstFile = files[0];
+    for (const [key, value] of this.fileCache.entries()) {
+      if (key.startsWith(`${symbol}_`)) {
+        return value.detectedInterval;
+      }
+    }
+    
+    return null;
   }
 
   getAvailableIntervals(symbol) {
-    return this.fileInventory.get(symbol) || [];
+    // Return detected intervals from cached data
+    const files = this.fileInventory.get(symbol) || [];
+    const intervals = [];
+    
+    for (const file of files) {
+      for (const [key, value] of this.fileCache.entries()) {
+        if (key.includes(file.replace('.csv', ''))) {
+          if (value.detectedInterval) {
+            intervals.push(value.detectedInterval);
+          }
+        }
+      }
+    }
+    
+    return intervals;
   }
 
   hasData(symbol, interval) {
-    const intervals = this.fileInventory.get(symbol);
-    return intervals ? intervals.includes(interval) : false;
+    const files = this.fileInventory.get(symbol);
+    return files && files.length > 0;
   }
 
   async fetchHistorical(symbol, interval) {
-    const fileKey = `${symbol}_${interval}`;
-
     console.log(`📥 Fetching ${symbol} @ ${interval}...`);
 
+    // Find matching file for this symbol
+    const files = this.fileInventory.get(symbol);
+    if (!files || files.length === 0) {
+      throw new Error(`No data available for ${symbol}`);
+    }
+
+    const matchingFile = files[0]; // Use first file for symbol
+    const fileKey = `${symbol}_${matchingFile}`;
+
     if (this.fileCache.has(fileKey)) {
-      console.log(`✅ Loaded ${this.fileCache.get(fileKey).length} bars from cache`);
-      return this.fileCache.get(fileKey);
+      const cached = this.fileCache.get(fileKey);
+      console.log(`✅ Loaded ${cached.data.length} bars from cache (${cached.detectedInterval})`);
+      return cached.data;
     }
 
-    if (!this.hasData(symbol, interval)) {
-      throw new Error(`No data available for ${symbol} at ${interval} interval`);
-    }
+    const url = this.baseUrl + matchingFile;
+    const result = await this._loadCSV(url);
 
-    const filename = `${symbol}_${interval}.csv`;
-    const url = this.baseUrl + filename;
-    const data = await this._loadCSV(url);
+    this.fileCache.set(fileKey, result);
 
-    this.fileCache.set(fileKey, data);
-
-    console.log(`✅ Loaded ${data.length} bars for ${symbol} @ ${interval}`);
-    return data;
+    console.log(`✅ Loaded ${result.data.length} bars for ${symbol} @ ${result.detectedInterval}`);
+    return result.data;
   }
 
   async _loadCSV(url) {
@@ -145,7 +220,11 @@ class CSVDataProvider extends OakViewDataProvider {
             const lastTime = new Date(data[data.length - 1].time * 1000).toISOString().split('T')[0];
             console.log(`📊 Parsed CSV: ${data.length} bars, ${firstTime} to ${lastTime}`);
 
-            resolve(data);
+            // Auto-detect interval from data
+            const detectedInterval = this._detectInterval(data);
+            console.log(`🔍 Detected interval: ${detectedInterval}`);
+
+            resolve({ data, detectedInterval });
           } catch (error) {
             console.error('❌ CSV parsing error:', error);
             reject(new Error(`Failed to parse CSV: ${error.message}`));
@@ -157,6 +236,52 @@ class CSVDataProvider extends OakViewDataProvider {
         }
       });
     });
+  }
+
+  _detectInterval(data) {
+    if (data.length < 2) return null;
+
+    // Calculate time differences between first few bars (sample up to 10)
+    const samples = Math.min(10, data.length - 1);
+    const diffs = [];
+    
+    for (let i = 0; i < samples; i++) {
+      const diff = data[i + 1].time - data[i].time;
+      diffs.push(diff);
+    }
+
+    // Get median difference (more robust than average)
+    diffs.sort((a, b) => a - b);
+    const medianDiff = diffs[Math.floor(diffs.length / 2)];
+    
+    console.log(`🔍 Time diffs (seconds):`, diffs);
+    console.log(`🔍 Median diff: ${medianDiff}s`);
+
+    // Convert to appropriate interval format
+    if (medianDiff <= 60) {
+      // Seconds (including 60s which is 1 minute, but we keep it as seconds for sub-minute precision)
+      return `${medianDiff}s`;
+    } else if (medianDiff < 3600) {
+      // Minutes
+      const minutes = Math.round(medianDiff / 60);
+      return `${minutes}`;
+    } else if (medianDiff < 86400) {
+      // Hours
+      const hours = Math.round(medianDiff / 3600);
+      return `${hours * 60}`;
+    } else if (medianDiff < 604800) {
+      // Days
+      const days = Math.round(medianDiff / 86400);
+      return days === 1 ? '1D' : `${days}D`;
+    } else if (medianDiff < 2592000) {
+      // Weeks
+      const weeks = Math.round(medianDiff / 604800);
+      return `${weeks}W`;
+    } else {
+      // Months
+      const months = Math.round(medianDiff / 2592000);
+      return `${months}M`;
+    }
   }
 
   _parseTime(timeValue) {

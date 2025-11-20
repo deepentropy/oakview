@@ -13,7 +13,7 @@ test.describe('CSV Example', () => {
     await expect(oakView).toBeVisible();
 
     // Check that symbol is set correctly
-    await expect(oakView).toHaveAttribute('symbol', 'QQQ');
+    await expect(oakView).toHaveAttribute('symbol', 'BATS_TSLA');
 
     // Check that theme is dark
     await expect(oakView).toHaveAttribute('theme', 'dark');

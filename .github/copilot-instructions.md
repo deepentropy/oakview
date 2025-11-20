@@ -3,10 +3,12 @@
 ## Project Context
 
 **What is OakView?**
-- JavaScript library wrapper around TradingView's lightweight-charts v5
-- Provides Web Components (`<oak-view-chart>`, `<oak-view-layout>`)
+- JavaScript/TypeScript library wrapper around TradingView's lightweight-charts v5
+- **Goal: Pixel-perfect TradingView web interface replication**
+- Provides internal components (not exposed to integrators directly)
 - Adds TradingView-like UI/UX (symbol search, interval selector, chart type toolbar, drawing tools)
 - Data provider abstraction for flexible data sources (WebSocket, REST API, CSV, etc.)
+- Client-side data resampling (receive tick data, display multiple timeframes without multiple subscriptions)
 
 **Your Role:**
 You are the primary maintainer of the OakView library. You:
@@ -19,6 +21,31 @@ You are the primary maintainer of the OakView library. You:
 - Approves/rejects new feature implementations
 - Final decision on API changes
 - Architecture decisions
+
+---
+
+## Technology Stack
+
+**CRITICAL:** OakView uses **lightweight-charts v5 API ONLY** (not v4)
+
+### Required Reading (Refer to these during development)
+- **Documentation**: https://tradingview.github.io/lightweight-charts/docs
+- **Tutorials**: https://tradingview.github.io/lightweight-charts/tutorials
+- **API Reference**: https://tradingview.github.io/lightweight-charts/docs/api
+- **v4 to v5 Migration Guide**: https://tradingview.github.io/lightweight-charts/docs/migrations/from-v4-to-v5
+  - **WARNING**: Your training data likely includes v4 patterns - ALWAYS check migration guide
+- **Plugin Creation**: https://tradingview.github.io/lightweight-charts/docs/plugins/intro
+- **Indicators Integration**: https://tradingview.github.io/lightweight-charts/tutorials/analysis-indicators
+
+### TradingView Design Resources
+- **Complete page reference**: `docs/design/complete/` (CSS + JS)
+- **Interface screenshot**: `docs/design/tradingview.png`
+- **Design specifications**: `docs/tv_systematic_analysis/design_specification.md`
+- **SVG icons**: `docs/tv_systematic_analysis/svg_icons/`
+
+### Language
+- **TypeScript** for all new code
+- Follow existing patterns in codebase
 
 ---
 
@@ -114,19 +141,68 @@ Developers should NEVER bypass OakView's public API by:
 
 ### Pattern 1: Real-time Data Integration
 ```javascript
-// CORRECT
+// CORRECT - Time normalization is automatic
 const historical = await provider.fetchHistorical(symbol, interval);
-chart.setData(historical);  // Stores in internal _data
+chart.setData(historical);  // Normalizes time to Unix seconds
 const unsub = provider.subscribe(symbol, interval, (bar) => {
-  chart.updateRealtime(bar);  // Updates current series
+  chart.updateRealtime(bar);  // Normalizes time automatically
 });
+
+// Time can be: Date object, ISO string, milliseconds, or seconds
+// OakView normalizes all to Unix timestamp in seconds
 
 // INCORRECT - Breaks chart type toolbar
 const series = chart.getChart().addSeries(CandlestickSeries);
 series.update(bar);
 ```
 
-### Pattern 2: Data Provider Implementation
+### Pattern 2: High-Frequency Tick Data (100ms, 1s, etc.)
+```javascript
+// CORRECT - OakView handles millisecond precision
+provider.subscribe('SPX', '100ms', (tick) => {
+  chart.updateRealtime({
+    time: Date.now() / 1000,  // ✅ Preserves millisecond precision
+    open: tick.price,
+    high: tick.price,
+    low: tick.price,
+    close: tick.price,
+    volume: tick.volume
+  });
+});
+
+// INCORRECT - Loses millisecond precision
+provider.subscribe('SPX', '100ms', (tick) => {
+  chart.updateRealtime({
+    time: Math.floor(Date.now() / 1000),  // ❌ Strips milliseconds
+    ...
+  });
+});
+
+// OakView supports timestamps with decimal precision:
+// 1700000000.123 = Unix seconds with millisecond precision
+```
+
+### Pattern 3: Client-Side Resampling
+```javascript
+// Provider returns base interval (finest granularity)
+class MyProvider extends OakViewDataProvider {
+  getBaseInterval(symbol) {
+    return '1';  // 1-minute bars
+  }
+  
+  fetchHistorical(symbol, interval) {
+    // ALWAYS return base interval data
+    // OakView resamples to requested interval client-side
+    return fetch(`/api/data/${symbol}/1min`);
+  }
+}
+
+// User switches from 1min → 5min → 1H
+// OakView resamples client-side (no new fetch)
+// Multiple charts can show different intervals of same data
+```
+
+### Pattern 4: Data Provider Implementation
 ```javascript
 class MyDataProvider extends OakViewDataProvider {
   async fetchHistorical(symbol, interval) {
@@ -151,6 +227,24 @@ class MyDataProvider extends OakViewDataProvider {
 
 ---
 
+## Known Issues & Solutions
+
+### Time Format Errors (RESOLVED)
+**Issue:** `Cannot update oldest data, last time=[object Object]`
+
+**Root Cause:** Using `Math.floor()` when converting milliseconds to seconds stripped sub-second precision, causing consecutive bars to have identical timestamps.
+
+**Solution:** OakView now preserves millisecond precision
+- Time values are float seconds (e.g., `1700000000.123`)
+- Supports streaming down to 1ms precision
+- Use `Date.now() / 1000` NOT `Math.floor(Date.now() / 1000)`
+- Auto-normalizes: Date objects, ISO strings, milliseconds, seconds
+- Supports intervals: `1ms`, `10ms`, `100ms`, `1S`, `1`, `1H`, `1D`, etc.
+
+**Reference:** `.tmp/MILLISECOND_PRECISION_SUPPORT.md`
+
+---
+
 ## Session Start Checklist
 
 At the beginning of each session:
@@ -160,6 +254,7 @@ At the beginning of each session:
 3. **Review recent changes** with `git log --oneline -5`
 4. **Understand the task** - Bug report? Integration question? Feature request?
 5. **Apply decision workflow** - Can they implement without changes?
+6. **Check v5 API compatibility** - Avoid v4 patterns from training data
 
 ---
 

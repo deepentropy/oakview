@@ -107,7 +107,7 @@ class OakViewDataProvider {
    *     if (tick.symbol === symbol) {
    *       // Aggregate into bar and call callback
    *       callback({
-   *         time: Math.floor(Date.now() / 1000),
+   *         time: Date.now() / 1000, // Unix timestamp in seconds (with millisecond precision)
    *         open: tick.price,
    *         high: tick.price,
    *         low: tick.price,

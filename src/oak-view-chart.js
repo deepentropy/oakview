@@ -85,15 +85,50 @@ class OakViewChart extends HTMLElement {
     if (!this.currentSeries) return;
 
     try {
+      // Normalize time to Unix timestamp in seconds
+      const normalizedData = { ...data };
+      normalizedData.time = this._normalizeTime(data.time);
+      
+      console.log('🔧 OakView updateRealtime:', {
+        inputTime: data.time,
+        normalizedTime: normalizedData.time,
+        normalizedTimeType: typeof normalizedData.time,
+        fullData: normalizedData
+      });
+      
       // Convert data format for line series
       if (this._currentChartType === 'line') {
-        this.currentSeries.update({ time: data.time, value: data.close });
+        this.currentSeries.update({ time: normalizedData.time, value: normalizedData.close });
       } else {
-        this.currentSeries.update(data);
+        this.currentSeries.update(normalizedData);
       }
     } catch (error) {
       console.error('Failed to update realtime data:', error);
     }
+  }
+  
+  /**
+   * Normalize time value to Unix timestamp in seconds
+   * @param {number|Date|string} time - Time value
+   * @returns {number} Unix timestamp in seconds
+   * @private
+   */
+  _normalizeTime(time) {
+    if (time instanceof Date) {
+      // Keep millisecond precision: divide by 1000 but don't floor
+      return time.getTime() / 1000;
+    }
+    if (typeof time === 'string') {
+      return new Date(time).getTime() / 1000;
+    }
+    if (typeof time === 'number') {
+      // If it looks like milliseconds (> year 2200 in seconds), convert to seconds
+      if (time > 10000000000) {
+        return time / 1000; // Keep millisecond precision
+      }
+      return time; // Already in seconds, keep as-is (may have decimal for sub-second precision)
+    }
+    throw new Error(`Invalid time format: ${time}`);
   }
 
   /**
@@ -104,7 +139,11 @@ class OakViewChart extends HTMLElement {
    * @public
    */
   setData(data) {
-    this._data = data;
+    // Normalize time values in all data points
+    this._data = data.map(bar => ({
+      ...bar,
+      time: this._normalizeTime(bar.time)
+    }));
     this.updateChartType();
     
     // Update legend with current symbol and interval
@@ -153,6 +192,58 @@ class OakViewChart extends HTMLElement {
   }
 
   /**
+   * Configure timescale based on interval
+   * @param {string} interval - Interval string (e.g., '1', '60', '1D')
+   * @private
+   */
+  _configureTimescale(interval) {
+    if (!this.chart) return;
+    
+    const intervalMs = this.parseIntervalToMs(interval);
+    
+    // Determine timescale settings based on interval
+    let timeVisible = true;
+    let secondsVisible = false;
+    let localization = undefined;
+    
+    if (intervalMs < 1000) {
+      // Sub-second: show milliseconds with custom formatter
+      timeVisible = true;
+      secondsVisible = true;
+      localization = {
+        timeFormatter: (time) => {
+          const date = new Date(time * 1000);
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          const seconds = String(date.getSeconds()).padStart(2, '0');
+          const ms = String(date.getMilliseconds()).padStart(3, '0');
+          return `${hours}:${minutes}:${seconds}.${ms}`;
+        }
+      };
+    } else if (intervalMs < 60000) {
+      // Sub-minute: show seconds
+      timeVisible = true;
+      secondsVisible = true;
+    } else if (intervalMs < 86400000) {
+      // Intraday (minutes/hours): show time without seconds
+      timeVisible = true;
+      secondsVisible = false;
+    } else {
+      // Daily or longer: hide time, show only date
+      timeVisible = false;
+      secondsVisible = false;
+    }
+    
+    this.chart.applyOptions({
+      timeScale: {
+        timeVisible,
+        secondsVisible,
+      },
+      localization
+    });
+  }
+
+  /**
    * Load symbol data with optional client-side resampling
    * 
    * If the data provider declares a base interval and the requested interval
@@ -174,12 +265,21 @@ class OakViewChart extends HTMLElement {
       this.setAttribute('symbol', symbol);
       this.setAttribute('interval', interval);
       
+      // Configure timescale for this interval
+      this._configureTimescale(interval);
+      
       const baseInterval = this._dataProvider.getBaseInterval?.(symbol);
+      
+      // If no interval specified, use base interval from provider
+      if (!interval) {
+        interval = baseInterval || '1D';
+      }
       
       // If no base interval or requesting base interval, fetch directly
       if (!baseInterval || interval === baseInterval) {
         const data = await this._dataProvider.fetchHistorical(symbol, interval);
         this.setData(data);
+        this.setAttribute('interval', interval);
         this.updateLegend(symbol, interval);
         return;
       }
@@ -197,11 +297,13 @@ class OakViewChart extends HTMLElement {
         
         console.log(`✅ Resampled ${baseData.length} bars → ${resampledData.length} bars`);
         this.setData(resampledData);
+        this.setAttribute('interval', interval);
         this.updateLegend(symbol, interval);
       } else {
         // Target interval is finer than base - must request from provider
         const data = await this._dataProvider.fetchHistorical(symbol, interval);
         this.setData(data);
+        this.setAttribute('interval', interval);
         this.updateLegend(symbol, interval);
       }
     } catch (error) {
@@ -2312,9 +2414,22 @@ class OakViewChart extends HTMLElement {
   formatIntervalDisplay(interval) {
     if (!interval) return 'D';
     
-    // If already formatted with unit, just use the unit part
-    if (interval.match(/[HDWMY]$/)) {
-      return interval.replace(/^\d+/, '').toUpperCase() || interval;
+    // Handle second intervals (e.g., "1S" -> "1s")
+    if (interval.match(/^\d+S$/i)) {
+      const seconds = parseInt(interval);
+      return seconds === 1 ? '1s' : `${seconds}s`;
+    }
+    
+    // Handle millisecond intervals (e.g., "100ms" -> "100ms")
+    if (interval.toLowerCase().endsWith('ms')) {
+      return interval.toLowerCase();
+    }
+    
+    // If already formatted with unit, just use the unit part or full value
+    if (interval.match(/[HDWMY]$/i)) {
+      const num = parseInt(interval);
+      const unit = interval.replace(/^\d+/, '').toUpperCase();
+      return num === 1 ? unit : interval.toUpperCase();
     }
     
     // Convert numeric minutes to display format
@@ -2329,7 +2444,7 @@ class OakViewChart extends HTMLElement {
       const hours = minutes / 60;
       return `${hours}H`;
     }
-    return `${minutes}`;
+    return `${minutes}m`;
   }
 
   /**
@@ -2364,6 +2479,9 @@ class OakViewChart extends HTMLElement {
             intervalBtn.textContent = this.formatIntervalDisplay(baseInterval);
           }
           
+          // Update legend with new interval
+          this.updateLegend(symbol, baseInterval);
+          
           console.log(`✓ Auto-updated interval to base interval: ${baseInterval}`);
         }
       }
@@ -2371,12 +2489,13 @@ class OakViewChart extends HTMLElement {
       // Define interval hierarchy (in ascending order of duration)
       // Using both minute notation (1, 5, 60, 120) and H/D/W/M/Y notation
       const intervalHierarchy = [
-        '1', '5', '15', '30',        // Minutes
+        '1S', '5S', '10S', '15S', '30S', '45S',  // Seconds
+        '1', '2', '3', '4', '5', '10', '15', '30', '45',        // Minutes
         '60', '120', '180', '240', '720',  // Hours (in minutes)
         '1H', '2H', '4H', '12H',     // Hours (H notation)
         '1D',                         // Days
         '1W',                         // Weeks
-        '1M', '3M', '6M',            // Months
+        '1M', '3M', '6M', '12M',     // Months
         '1Y'                          // Years
       ];
 
@@ -2439,6 +2558,29 @@ class OakViewChart extends HTMLElement {
         }
       });
 
+      // Hide separators between hidden sections or if adjacent sections are both hidden
+      const allElements = Array.from(intervalMenu.children);
+      let lastVisibleWasSeparator = false;
+      
+      allElements.forEach((el, index) => {
+        if (el.classList.contains('dropdown-separator')) {
+          // Check if previous and next visible elements exist
+          const prevVisible = allElements.slice(0, index).reverse().find(e => 
+            e.style.display !== 'none' && !e.classList.contains('dropdown-separator')
+          );
+          const nextVisible = allElements.slice(index + 1).find(e => 
+            e.style.display !== 'none' && !e.classList.contains('dropdown-separator')
+          );
+          
+          // Hide separator if no visible elements on either side
+          if (!prevVisible || !nextVisible) {
+            el.style.display = 'none';
+          } else {
+            el.style.display = '';
+          }
+        }
+      });
+
     } catch (error) {
       console.error('Failed to update available intervals:', error);
     }
@@ -2446,12 +2588,12 @@ class OakViewChart extends HTMLElement {
 
   /**
    * Parse interval string to minutes for comparison
-   * @param {string} interval - Interval string (e.g., '1', '60', '1H', '1D')
+   * @param {string} interval - Interval string (e.g., '1s', '1', '60', '1H', '1D')
    * @returns {number} Duration in minutes
    * @private
    */
   parseIntervalToMinutes(interval) {
-    const match = interval.match(/^(\d+)([mHDWMY]?)$/i);
+    const match = interval.match(/^(\d+)([smHDWMY]?)$/i);
     if (!match) {
       console.warn('Unknown interval format:', interval);
       return 1440; // Default to 1 day
@@ -2461,6 +2603,8 @@ class OakViewChart extends HTMLElement {
     const value = parseInt(num);
 
     switch (unit.toUpperCase()) {
+      case 'S':     // Seconds
+        return value / 60;
       case '':      // Minutes (default)
       case 'M':     // Minutes (when lowercase 'm' or when it's just a number)
         // Check if it's actually months (uppercase M without number prefix conflicts)
@@ -2506,11 +2650,23 @@ class OakViewChart extends HTMLElement {
         if (intervalMenu.classList.contains('show')) {
           intervalMenu.classList.remove('show');
         } else {
+          // Close all other dropdowns first
+          this.shadowRoot.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+            if (menu !== intervalMenu) menu.classList.remove('show');
+          });
+          
           // Position the dropdown
           const btnRect = intervalBtn.getBoundingClientRect();
           intervalMenu.style.top = `${btnRect.bottom}px`;
           intervalMenu.style.left = `${btnRect.left}px`;
           intervalMenu.classList.add('show');
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!e.composedPath().includes(intervalBtn) && !e.composedPath().includes(intervalMenu)) {
+          intervalMenu.classList.remove('show');
         }
       });
 
@@ -2541,19 +2697,11 @@ class OakViewChart extends HTMLElement {
 
           const interval = item.dataset.interval;
 
-          // Update button text
-          let buttonText = interval;
-          if (interval === '1D') buttonText = 'D';
-          else if (interval === '1W') buttonText = 'W';
-          else if (interval === '1M') buttonText = 'M';
-          else if (interval.endsWith('M')) buttonText = interval;
-          else if (parseInt(interval) >= 60) {
-            const hours = parseInt(interval) / 60;
-            buttonText = hours + 'H';
-          } else {
-            buttonText = interval + 'm';
-          }
-          intervalBtn.textContent = buttonText;
+          // Update button text with formatted interval
+          intervalBtn.textContent = this.formatIntervalDisplay(interval);
+          
+          // Update the interval attribute
+          this.setAttribute('interval', interval);
 
           intervalMenu.classList.remove('show');
 
@@ -2564,6 +2712,9 @@ class OakViewChart extends HTMLElement {
               .then(data => {
                 this._data = data;
                 this.updateChartType();
+                
+                // Update legend with the selected interval
+                this.updateLegend();
               })
               .catch(error => {
                 console.error('Failed to load interval data:', error);
@@ -2855,16 +3006,25 @@ class OakViewChart extends HTMLElement {
       // Update available intervals for this symbol
       this.updateAvailableIntervals(symbol);
 
+      // Get the base interval for this symbol
+      let targetInterval = '1D'; // default fallback
+      if (this._dataProvider && typeof this._dataProvider.getBaseInterval === 'function') {
+        const baseInterval = this._dataProvider.getBaseInterval(symbol);
+        if (baseInterval) {
+          targetInterval = baseInterval;
+        }
+      }
+
       // Dispatch symbol-change event
       this.dispatchEvent(new CustomEvent('symbol-change', {
-        detail: { symbol, interval: '1D' },
+        detail: { symbol, interval: targetInterval },
         bubbles: true,
         composed: true
       }));
 
       // Dispatch data-request event (can be prevented for manual handling)
       const dataRequestEvent = new CustomEvent('data-request', {
-        detail: { symbol, interval: '1D' },
+        detail: { symbol, interval: targetInterval },
         bubbles: true,
         composed: true,
         cancelable: true
@@ -3150,8 +3310,9 @@ class OakViewChart extends HTMLElement {
       symbolEl.textContent = symbol;
     }
     if (timeframeEl && interval) {
-      console.log(`[OakView] Updating legend interval: ${interval}`);
-      timeframeEl.textContent = interval;
+      const formattedInterval = this.formatIntervalDisplay(interval);
+      console.log(`[OakView] Updating legend interval: ${interval} -> ${formattedInterval}`);
+      timeframeEl.textContent = formattedInterval;
     }
     if (exchangeEl) exchangeEl.textContent = exchange;
 
@@ -3479,7 +3640,22 @@ class OakViewChart extends HTMLElement {
    */
   setData(data) {
     this._data = data;
-    this.updateChartType();
+    
+    // Configure timescale based on current interval
+    const interval = this.getAttribute('interval');
+    if (interval) {
+      this._configureTimescale(interval);
+    }
+    
+    // If chart not yet initialized, wait for it
+    if (!this.chart) {
+      // Wait for chart-ready event
+      this.addEventListener('chart-ready', () => {
+        this.updateChartType();
+      }, { once: true });
+    } else {
+      this.updateChartType();
+    }
   }
 
   /**

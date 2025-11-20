@@ -244,7 +244,7 @@ export interface OakViewDataProvider {
    *   
    *   return data.bars
    *     .map(bar => ({
-   *       time: Math.floor(new Date(bar.date).getTime() / 1000), // SECONDS!
+   *       time: new Date(bar.date).getTime() / 1000, // Unix seconds (supports sub-second precision)
    *       open: parseFloat(bar.open),
    *       high: parseFloat(bar.high),
    *       low: parseFloat(bar.low),

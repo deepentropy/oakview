@@ -33,10 +33,10 @@ test.describe('CSV Example - Legend Updates', () => {
 
     console.log('Initial legend:', legend);
     
-    // Should show QQQ @ 60 after data loads
+    // Should show BATS_TSLA @ 1s after data loads
     expect(legend).toBeTruthy();
-    expect(legend.symbol).toBe('QQQ');
-    expect(legend.interval).toBe('60');
+    expect(legend.symbol).toBe('BATS_TSLA');
+    expect(legend.interval).toBe('1s');
   });
 
   test('legend updates when interval changes', async ({ page }) => {

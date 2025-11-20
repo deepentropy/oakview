@@ -175,6 +175,23 @@
           }
         }
 
+        // Update pane settings and sync control chart
+        if (chart._paneSettings && chart._panes && chart._panes.length > 0) {
+          const paneId = chart._panes[0].id;
+          const settings = chart._paneSettings.get(paneId);
+          if (settings) {
+            settings.symbol = symbol;
+            settings.interval = interval;
+          }
+        }
+        
+        // DIRECTLY update control chart attributes (bypass selectPane)
+        const controlChart = chart.shadowRoot?.querySelector('.control-chart');
+        if (controlChart) {
+          controlChart.setAttribute('symbol', symbol);
+          controlChart.setAttribute('interval', interval);
+        }
+
         console.log(`✓ Loaded ${currentData.length} bars @ ${interval}`);
       } catch (error) {
         console.error('Failed to load data:', error);

@@ -36,7 +36,7 @@ class OakViewChart extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['width', 'height', 'theme', 'symbol', 'show-toolbar', 'hide-sidebar'];
+    return ['width', 'height', 'theme', 'symbol', 'interval', 'show-toolbar', 'hide-sidebar'];
   }
 
   async connectedCallback() {
@@ -475,6 +475,18 @@ class OakViewChart extends HTMLElement {
     if (name === 'symbol') {
       const symbolBtn = this.shadowRoot.querySelector('.symbol-button');
       if (symbolBtn) symbolBtn.textContent = newValue || 'SYMBOL';
+      
+      // Update legend when symbol changes
+      const interval = this.getAttribute('interval') || '1D';
+      this.updateLegend(newValue, interval);
+    }
+
+    if (name === 'interval') {
+      // Update legend when interval changes
+      const symbol = this.getAttribute('symbol');
+      if (symbol) {
+        this.updateLegend(symbol, newValue);
+      }
     }
   }
 
@@ -3122,16 +3134,25 @@ class OakViewChart extends HTMLElement {
   }
 
   updateLegend(symbol, interval, exchange = 'NASDAQ') {
-    const legendElement = this.shadowRoot.querySelector('.chart-legend');
-    if (!legendElement) return;
+    const legendElement = this.shadowRoot?.querySelector('.chart-legend');
+    if (!legendElement) {
+      console.warn('[OakView] Legend element not found, cannot update');
+      return;
+    }
 
     // Update titles
     const symbolEl = legendElement.querySelector('.legend-symbol');
     const timeframeEl = legendElement.querySelector('.legend-timeframe');
     const exchangeEl = legendElement.querySelector('.legend-exchange');
 
-    if (symbolEl && symbol) symbolEl.textContent = symbol;
-    if (timeframeEl && interval) timeframeEl.textContent = interval;
+    if (symbolEl && symbol) {
+      console.log(`[OakView] Updating legend symbol: ${symbol}`);
+      symbolEl.textContent = symbol;
+    }
+    if (timeframeEl && interval) {
+      console.log(`[OakView] Updating legend interval: ${interval}`);
+      timeframeEl.textContent = interval;
+    }
     if (exchangeEl) exchangeEl.textContent = exchange;
 
     // Update OHLC values with the last bar

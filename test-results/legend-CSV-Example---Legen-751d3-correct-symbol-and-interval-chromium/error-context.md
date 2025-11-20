@@ -46,7 +46,7 @@
               - cell
               - cell "Charting by TradingView" [ref=e38]:
                 - link "Charting by TradingView" [ref=e42] [cursor=pointer]:
-                  - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/examples/csv-example/index.html
+                  - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/examples/csv-example/
                   - img [ref=e43]
               - cell
             - row [ref=e47]:
@@ -79,7 +79,7 @@
         - cell
         - cell "Charting by TradingView" [ref=e64]:
           - link "Charting by TradingView" [ref=e68]:
-            - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/examples/csv-example/index.html
+            - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/examples/csv-example/
             - img [ref=e69]
         - cell [ref=e73]
       - row [ref=e77]:

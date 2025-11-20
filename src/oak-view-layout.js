@@ -551,11 +551,9 @@ class OakViewChartLayout extends HTMLElement {
     const settings = this._paneSettings.get(paneId);
 
     if (controlChart && selectedChart && settings) {
-      // Update control chart to show the selected pane's symbol
+      // Update control chart to show the selected pane's symbol and interval
       controlChart.setAttribute('symbol', settings.symbol);
-
-      // Note: We could also update interval display here if the control chart
-      // had a way to display/set the current interval
+      controlChart.setAttribute('interval', settings.interval || '1D');
     }
 
     // Dispatch event
